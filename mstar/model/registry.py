@@ -18,6 +18,7 @@ MODEL_REGISTRY: dict[str, tuple[str, str]] = {
     "cosmos3_super_i2v_4step": ("mstar.model.cosmos3.cosmos3_model", "Cosmos3Model"),
     "cosmos3_super_t2i_4step": ("mstar.model.cosmos3.cosmos3_model", "Cosmos3Model"),
     "cosyvoice3": ("mstar.model.cosyvoice3.cosyvoice3_model", "CosyVoice3Model"),
+    "dreamerv3": ("mstar.model.dreamerv3.dreamerv3_model", "DreamerV3Model"),
     "flux2_klein": ("mstar.model.flux2_klein.flux2_klein_model", "Flux2KleinModel"),
     "flux2_klein_9b": ("mstar.model.flux2_klein.flux2_klein_model", "Flux2KleinModel"),
     "fish_s2_pro": ("mstar.model.fish_s2_pro.fish_s2_pro_model", "FishS2ProModel"),

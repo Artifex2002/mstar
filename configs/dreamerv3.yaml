@@ -1,0 +1,7 @@
+# Development scaffold: real inference is not implemented yet.
+model: "dreamerv3"
+node_groups:
+  - node_names: [policy_step]
+    ranks: [0]
+    graph_walks: [act]
+    

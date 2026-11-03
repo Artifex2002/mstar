@@ -56,6 +56,9 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
      - Zero-shot voice-cloning TTS: Qwen2-0.5B speech-token LM with RAS sampling,
        DiT flow-matching decoder and causal HiFT vocoder, streamed in chunks.
        Clones from a preset or an uploaded clip. 24 kHz.
+   * - ``dreamerv3`` *(Development scaffold)*
+     - Not selected
+     - Frozen DreamerV3 policy integration under development; inference is not implemented yet.
    * - ``kokoro``
      - ``hexgrad/Kokoro-82M``
      - TTS (82M, not autoregressive): misaki G2P + PL-BERT prosody + iSTFTNet
