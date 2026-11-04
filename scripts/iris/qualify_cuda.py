@@ -7,8 +7,11 @@ correctness qualification, not a timing benchmark or full-server test.
 import argparse
 import importlib.metadata
 import json
+import os
 import platform
+import shutil
 import subprocess
+import sys
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,6 +39,20 @@ def require_cuda():
     torch.ones(1, device="cuda").add_(1).cpu()
 
 
+def prepare_build_tools():
+    # Running a venv's Python directly does not activate its scripts directory
+    # for JIT compilers launching tools by name in child processes.
+    scripts = str(Path(sys.executable).parent)
+    os.environ["PATH"] = os.pathsep.join((scripts, os.environ.get("PATH", os.defpath)))
+    ninja = shutil.which("ninja")
+    if ninja is None:
+        raise RuntimeError(
+            f"ninja is not installed or executable; install it with: uv pip install --python {sys.executable} ninja"
+        )
+    version = subprocess.check_output([ninja, "--version"], text=True).strip()
+    return {"ninja": ninja, "ninja_version": version}
+
+
 def qualify(args, report, save):
     report["stage"] = "cuda_preflight"
     save()
@@ -52,6 +69,10 @@ def qualify(args, report, save):
         report["nvidia_smi"] = subprocess.run(["nvidia-smi"], capture_output=True, text=True, check=False).stdout
     except OSError as exc:
         report["nvidia_smi"] = str(exc)
+    report["stage"] = "build_tools_preflight"
+    save()
+    report["build_tools"] = prepare_build_tools()
+    save()
     from mstar.engine.fp32_precision import Fp32Precision, fp32_precision_scope
     from scripts.iris.qualification import compare_trace, sampling_smoke
 

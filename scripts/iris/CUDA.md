@@ -46,6 +46,27 @@ OMP_NUM_THREADS=2 .venv/bin/python -m scripts.iris.qualify_cuda \
   2>&1 | tee .ci-results/iris/cuda-check-01.log
 ```
 
+The runner prepends its Python executable's directory to `PATH` so FlashInfer
+can launch the virtualenv-installed `ninja`. Its build-tools preflight records
+the resolved executable and version before sampling-kernel compilation.
+
+If an earlier checkout failed with `FileNotFoundError: 'ninja'`, keep the current
+runtime and run this replacement cell:
+
+```bash
+%%bash
+set -euo pipefail
+cd /content/mstar-iris
+git pull --ff-only origin codex/iris
+uv pip install --python .venv/bin/python ninja
+OMP_NUM_THREADS=2 .venv/bin/python -m scripts.iris.qualify_cuda \
+  --download-checkpoint --output .ci-results/iris/cuda-check-02 \
+  2>&1 | tee .ci-results/iris/cuda-check-02.log
+```
+
+Use `cuda-check-02/report.json` in the download cell after this retry. There is
+no need to repeat the repository clones or reinstall the full environment.
+
 The checkpoint download is approximately 127 MB and SHA256-verified. No ROMs or
 Atari simulator are needed. Inputs are synthetic test patterns, so the result
 establishes numerical mechanics rather than gameplay quality. First sampling
