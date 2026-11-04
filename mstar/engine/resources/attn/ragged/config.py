@@ -24,6 +24,7 @@ def cross_label(q_label: str, kv_label: str) -> str:
 
 
 class RaggedAttnBackend(Enum):
+    TORCH = "torch"
     # the platform's default, decided when the resource is built
     AUTO = "auto"
     FLASHINFER = "flashinfer"

@@ -17,12 +17,13 @@ from mstar.engine.resources.attn.wrappers import (
     FlashInferPrefillWrapper,
 )
 from mstar.engine.resources.base import AttentionResource, EngineResourceInfo
-from mstar.engine.resources.kv.config import KVConfig, KVGroup, PagedKVConfig, RingKVConfig
+from mstar.engine.resources.kv.config import KVConfig, KVGroup, KVLayout, PagedKVConfig, RingKVConfig
 from mstar.engine.resources.kv.keys import fingerprint
 from mstar.platforms import current_platform
 
 logger = logging.getLogger(__name__)
 _BACKEND_KV_CONFIG: dict[AttnBackend, type[KVConfig]] = {
+    AttnBackend.TORCH: PagedKVConfig,
     AttnBackend.DENSE: PagedKVConfig,
     AttnBackend.FLASHINFER: PagedKVConfig,
     AttnBackend.FLASHINFER_MLA: PagedKVConfig,
@@ -130,6 +131,12 @@ class AttentionManager(AttentionResource):
             )
         # `shard` lives on the KVConfig base, so this is unchanged for both.
         kv_config.shard(info.head_shards)
+        if backend is AttnBackend.TORCH:
+            from mstar.engine.resources.attn.torch_reference import TorchPagedAttention
+
+            if kv_config.layout is not KVLayout.NHD:
+                raise ValueError("torch reference attention requires NHD paged KV")
+            return TorchPagedAttention(spec.config.kv_cache, info.device)
         if backend == AttnBackend.DENSE:
             # A dense backend runs on FlashAttention-3 (AITER on ROCm). Where
             # that has no kernel for the GPU or does not import, the same pass

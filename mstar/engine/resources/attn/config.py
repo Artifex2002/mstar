@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class AttnBackend(Enum):
+    TORCH = "torch"
     # the platform's default, decided when the resource is built
     AUTO = "auto"
     FLASHINFER = "flashinfer"

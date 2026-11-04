@@ -86,6 +86,10 @@ class RaggedAttnManager(AttentionResource):
     @classmethod
     def build(cls, spec: RaggedAttentionSpec, info: EngineResourceInfo):
         backend = resolve_ragged_attn_backend(spec.config.backend, info.device)
+        if backend is RaggedAttnBackend.TORCH:
+            from mstar.engine.resources.attn.torch_reference import TorchRaggedAttention
+
+            return TorchRaggedAttention.build(spec, info)
         if backend is RaggedAttnBackend.DENSE:
             from mstar.engine.resources.attn.ragged.dense import DenseRaggedManager
             from mstar.engine.resources.attn.ragged.flashinfer import (
