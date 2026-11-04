@@ -11,11 +11,18 @@ contains these commands. A T4 is suitable for the existing eager configuration;
 the full-server run has not yet been qualified on it. Keep the previous CUDA
 report so both runs' commits and environment versions can be compared.
 
-## Prepare the existing Colab checkout
+## Prepare a fresh or existing Colab runtime
 
-Select a GPU runtime. If the previous runtime was reset, first run the setup
-cells in [qualify_colab.ipynb](qualify_colab.ipynb) to recreate the checkout and
-Python 3.12 environment. Otherwise reuse `/content/mstar-iris` and its checkpoint.
+Select a GPU runtime. Opening the notebook does not clone its repository;
+Colab runtimes also lose files when they reset. These setup cells create
+`/content/mstar-iris` and its Python 3.12 environment when missing, or reuse
+the existing checkout, virtualenv and cached checkpoint.
+
+Run this Python cell first:
+
+```python
+%pip install -q uv
+```
 
 Run this shell cell. Rust installation/build can take several minutes. The
 compiler version comes from this checkout's `rust-toolchain.toml`.
@@ -23,9 +30,15 @@ compiler version comes from this checkout's `rust-toolchain.toml`.
 ```bash
 %%bash
 set -euo pipefail
+if [ ! -e /content/mstar-iris ]; then
+  git clone --branch codex/iris --single-branch https://github.com/Artifex2002/mstar.git /content/mstar-iris
+fi
 cd /content/mstar-iris
 git switch codex/iris
 git pull --ff-only origin codex/iris
+if [ ! -e .venv ]; then
+  uv venv --python 3.12 .venv
+fi
 export PATH="$HOME/.cargo/bin:$PWD/.venv/bin:$PATH"
 if ! command -v rustup >/dev/null 2>&1; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
