@@ -1,13 +1,15 @@
-"""Batched eager FP32 serving nodes for supplied-action imagination."""
+"""FP32 serving nodes, with opt-in engine-managed accelerator graphs."""
 
 import torch
 
+from mstar.engine.accelerator_graph_config import BatchedAcceleratorGraphConfig, geometric_batch_sizes
 from mstar.engine.resources import AttentionStep, KVStep, PositionStep, SamplerStep, Segment, SubmoduleStep
 from mstar.model.iris.components import Tokenizer
 from mstar.model.iris.config import (
     DECODER_ATTN,
     ENCODER_ATTN,
     ENDING_SAMPLER,
+    IMAGINE_WALK,
     OBSERVATION_SAMPLER,
     REWARD_SAMPLER,
     ROLLOUT_LOOP,
@@ -27,9 +29,10 @@ class IrisSubmodule(NodeSubmodule):
     float32_matmul_precision = "highest"
     cudnn_allow_tf32 = False
 
-    def __init__(self, max_batch_size=2):
+    def __init__(self, max_batch_size=2, capture_graphs=False):
         super().__init__()
         self.batch_limit = max_batch_size
+        self.capture_graphs = capture_graphs
 
     def max_batch_size(self, graph_walk):
         return self.batch_limit
@@ -55,8 +58,8 @@ class IrisSubmodule(NodeSubmodule):
 
 
 class ImageSubmodule(IrisSubmodule):
-    def __init__(self, tokenizer, decode=False, initial=False, max_batch_size=2):
-        super().__init__(max_batch_size)
+    def __init__(self, tokenizer, decode=False, initial=False, max_batch_size=2, capture_graphs=False):
+        super().__init__(max_batch_size, capture_graphs)
         self.decode, self.initial = decode, initial
         self.embedding = tokenizer.embedding
         if decode:
@@ -64,6 +67,29 @@ class ImageSubmodule(IrisSubmodule):
         else:
             self.encoder, self.pre_quant_conv = tokenizer.encoder, tokenizer.pre_quant_conv
         self.attention_key = DECODER_ATTN if decode else ENCODER_ATTN
+
+    def get_accelerator_graph_configs(self, device, tp_world_size=1):
+        if not self.capture_graphs:
+            return []
+        tensors = (
+            {"observation_tokens": torch.zeros(16, dtype=torch.long, device=device)}
+            if self.decode
+            else {"initial_image": torch.zeros(3, 64, 64, device=device)}
+        )
+        if self.decode and not self.initial:
+            tensors.update(
+                reward_class=torch.ones(1, dtype=torch.long, device=device),
+                ending_class=torch.zeros(1, dtype=torch.long, device=device),
+            )
+        return [
+            BatchedAcceleratorGraphConfig(
+                IMAGINE_WALK,
+                NodeInputs(tensor_inputs=tensors),
+                compile=False,
+                capture_batch_sizes=geometric_batch_sizes(self.batch_limit),
+                input_seq_dims={name: 0 for name in tensors},
+            )
+        ]
 
     def prepare_inputs(self, graph_walk, fwd_info, inputs, **kwargs):
         names = ("observation_tokens",) if self.initial else WORLD_CARRY if self.decode else ("initial_image",)
@@ -95,10 +121,52 @@ class ImageSubmodule(IrisSubmodule):
 
 
 class WorldSubmodule(IrisSubmodule):
-    def __init__(self, network, max_horizon, max_batch_size=2):
-        super().__init__(max_batch_size)
+    def __init__(self, network, max_horizon, max_batch_size=2, capture_graphs=False):
+        super().__init__(max_batch_size, capture_graphs)
         self.network = network
         self.schedules = tuple(frame_calls(frame) for frame in range(max_horizon))
+
+    def get_accelerator_graph_configs(self, device, tp_world_size=1):
+        if not self.capture_graphs:
+            return []
+        calls = {self.call_key(call): call for schedule in self.schedules for call in schedule}
+        return [
+            BatchedAcceleratorGraphConfig(
+                IMAGINE_WALK,
+                NodeInputs(
+                    tensor_inputs={
+                        "tokens": torch.zeros(call.span, dtype=torch.long, device=device),
+                        "observation_tokens": torch.zeros(16, dtype=torch.long, device=device),
+                        "reward_class": torch.ones(1, dtype=torch.long, device=device),
+                        "ending_class": torch.zeros(1, dtype=torch.long, device=device),
+                    },
+                    kwargs={"call": call},
+                    resource_step_info=call,
+                    input_seq_len=call.span,
+                ),
+                additional_key_info=key,
+                compile=False,
+                capture_batch_sizes=geometric_batch_sizes(self.batch_limit),
+                input_seq_dims={name: 0 for name in ("tokens", *WORLD_CARRY)},
+            )
+            for key, call in calls.items()
+        ]
+
+    def cg_key_info(self, graph_walk, per_request_info, per_request_input_metadata=None, **kwargs):
+        if not self.capture_graphs:
+            return None
+        keys = set()
+        for rid, info in per_request_info.items():
+            meta = (per_request_input_metadata or {}).get(rid)
+            counts = meta.dynamic_loop_iter_counts if meta is not None else info.dynamic_loop_iter_counts
+            frame, token = counts.get(ROLLOUT_LOOP, 0), counts.get(TOKEN_LOOP, 0)
+            if frame >= info.step_metadata["iris_horizon"] or token >= len(self.schedules[frame]):
+                return ("overshoot",)
+            keys.add(self.call_key(self.schedules[frame][token]))
+        return next(iter(keys)) if len(keys) == 1 else ("mixed",)
+
+    def split_batches_by_capture_key(self, graph_walk):
+        return self.capture_graphs
 
     def prepare_inputs(self, graph_walk, fwd_info, inputs, **kwargs):
         # A new request's loop snapshot is sparse: absent counters mean zero.
@@ -147,7 +215,9 @@ class WorldSubmodule(IrisSubmodule):
             steps[ENDING_SAMPLER] = SamplerStep(apply_penalty=False, apply_filters=False)
         if not self.can_batch(None, inputs):
             raise ValueError("IRIS cannot declare an incompatible batch")
-        return SubmoduleStep(segments=segments, steps=steps)
+        return SubmoduleStep(
+            segments=segments, steps=steps, cg_key_info=self.call_key(call) if self.capture_graphs else None
+        )
 
     def compute(self, engine_inputs, tokens, call):
         resources = engine_inputs.resources

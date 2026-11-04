@@ -24,6 +24,7 @@ from mstar.platforms import current_platform
 logger = logging.getLogger(__name__)
 _BACKEND_KV_CONFIG: dict[AttnBackend, type[KVConfig]] = {
     AttnBackend.TORCH: PagedKVConfig,
+    AttnBackend.TORCH_STATIC: PagedKVConfig,
     AttnBackend.DENSE: PagedKVConfig,
     AttnBackend.FLASHINFER: PagedKVConfig,
     AttnBackend.FLASHINFER_MLA: PagedKVConfig,
@@ -131,6 +132,12 @@ class AttentionManager(AttentionResource):
             )
         # `shard` lives on the KVConfig base, so this is unchanged for both.
         kv_config.shard(info.head_shards)
+        if backend is AttnBackend.TORCH_STATIC:
+            from mstar.engine.resources.attn.torch_static import TorchStaticPagedAttention
+
+            if kv_config.layout is not KVLayout.NHD:
+                raise ValueError("torch_static attention requires NHD paged KV")
+            return TorchStaticPagedAttention(spec.config.kv_cache, info.device, kv_config)
         if backend is AttnBackend.TORCH:
             from mstar.engine.resources.attn.torch_reference import TorchPagedAttention
 

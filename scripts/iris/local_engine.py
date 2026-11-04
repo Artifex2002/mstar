@@ -25,10 +25,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class LocalIrisEngine:
-    def __init__(self, model, device="cpu"):
+    def __init__(self, model, device="cpu", config_path=None):
         self.model, self.device = model, torch.device(device)
         specs = model.get_node_resources()
-        apply_yaml_overrides(specs, yaml.safe_load((ROOT / "configs/iris.yaml").read_text()))
+        apply_yaml_overrides(specs, yaml.safe_load(Path(config_path or ROOT / "configs/iris.yaml").read_text()))
         self.specs = resolve_spec_dependencies(specs)
         transfer = TransferEngineInfo("iris-qualification", "local", LocalTransferEngine("localhost"))
         self.resources = {
@@ -49,9 +49,7 @@ class LocalIrisEngine:
         self.runner = StepRunner(self.resources, node_resources=nodes)
         self.horizons = {}
 
-    def open(self, rid, horizon, seed=0):
-        if rid in self.horizons:
-            raise ValueError(f"request {rid} is already open")
+    def request_configs(self, horizon, seed=0):
         configs = self.model.get_request_resource_configs({}, {"iris_horizon": horizon})
         configs[WORLD_KV].apply_conductor_config(
             kv_layout={label: layout.row() for label, layout in request_kv_layout(horizon)[WORLD_KV].items()},
@@ -60,7 +58,12 @@ class LocalIrisEngine:
         for key, config in configs.items():
             config.apply_conductor_config(seed=seed, resource_key=key)
             config.validate(self.specs[key])
-        self.runner.ingest_request(rid, configs)
+        return configs
+
+    def open(self, rid, horizon, seed=0):
+        if rid in self.horizons:
+            raise ValueError(f"request {rid} is already open")
+        self.runner.ingest_request(rid, self.request_configs(horizon, seed))
         self.horizons[rid] = horizon
 
     def info(self, rid, frame=0, token=0):

@@ -1,0 +1,22 @@
+# Experimental FP32 capture path. GPU qualification is required before benchmarks.
+model: iris
+max_seq_len: 340
+model_kwargs:
+  game: Breakout
+  max_rollout_horizon: 20
+  max_batch_size: 2
+  capture_graphs: true
+node_groups:
+  - node_names: [image_encoder, world_model, image_decoder, initial_image_decoder]
+    ranks: [0]
+resources:
+  world_kv:
+    page_size: 16
+    max_num_pages: 64
+    prefix_cache: false
+  world_attn:
+    backend: torch_static
+  encoder_attn:
+    backend: torch_static
+  decoder_attn:
+    backend: torch_static

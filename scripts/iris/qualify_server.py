@@ -34,11 +34,11 @@ from scripts.iris.server_checks import (
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def prepare_server_config(checkpoint, output):
+def prepare_server_config(checkpoint, output, deployment=None):
     from mstar.model.iris.iris_model import IrisModel
     from mstar.validation import validate_deployment
 
-    config = yaml.safe_load((ROOT / "configs/iris.yaml").read_text())
+    config = yaml.safe_load(Path(deployment or ROOT / "configs/iris.yaml").read_text())
     config["model_kwargs"]["checkpoint_path"] = str(checkpoint.resolve())
     config["max_concurrent_requests"] = 2
     config_path = output / "server.yaml"
@@ -221,7 +221,9 @@ def qualify(args, report, save):
     }
     report["stage"] = "deployment_validation"
     save()
-    config_path = prepare_server_config(args.checkpoint, args.output)
+    config_path = prepare_server_config(args.checkpoint, args.output, args.config)
+    captured = yaml.safe_load(config_path.read_text())["model_kwargs"].get("capture_graphs", False)
+    report["capture"] = "enabled; every declared bucket required" if captured else "disabled"
     if args.download_checkpoint:
         download_checkpoint(args.checkpoint)
     report["checkpoint_sha256"] = verify_checkpoint(args.checkpoint)
@@ -243,6 +245,7 @@ def qualify(args, report, save):
         extra_args=["--enable-metrics"],
         log_path=args.output / "server.log",
         startup_timeout_s=args.startup_timeout,
+        env={"MSTAR_REQUIRE_ACCELERATOR_GRAPHS": "1"} if captured else None,
     ) as server:
         report["server"] = server.info()
         try:
@@ -262,6 +265,7 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, default=Path(".ci-results/iris/Breakout.pt"))
     parser.add_argument("--download-checkpoint", action="store_true")
+    parser.add_argument("--config", type=Path, default=ROOT / "configs/iris.yaml")
     parser.add_argument("--startup-timeout", type=float, default=600.0)
     parser.add_argument("--request-timeout", type=float, default=300.0)
     args = parser.parse_args(argv)
@@ -273,8 +277,8 @@ def main(argv=None):
         "started_utc": datetime.now(UTC).isoformat(),
         "mstar_commit": git_output("rev-parse", "HEAD"),
         "working_tree_status": git_output("status", "--porcelain", "--untracked-files=no"),
-        "purpose": "full-server eager FP32 correctness; no performance measurement",
-        "capture": "disabled",
+        "purpose": "full-server FP32 correctness; no performance measurement",
+        "capture": "determined by deployment preflight",
     }
 
     def save():

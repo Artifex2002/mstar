@@ -1,6 +1,7 @@
 """IRIS dataflow and the reference's host-known per-frame call schedule."""
 
-from typing import Literal, NamedTuple
+from dataclasses import dataclass
+from typing import Literal
 
 from mstar.graph.base import GraphEdge, GraphNode, GraphSection, Loop, Parallel, Sequential
 from mstar.graph.special_destinations import EMIT_TO_CLIENT
@@ -18,7 +19,8 @@ from mstar.model.iris.config import (
 )
 
 
-class WorldCall(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class WorldCall:
     kind: Literal["prime", "action", "observation"]
     label: str
     position: int

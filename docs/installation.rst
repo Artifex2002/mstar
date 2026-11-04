@@ -57,6 +57,12 @@ For the full IRIS HTTP/conductor/native-worker qualification, install
 provide the setup, checks and report collection commands. This remains eager
 FP32 execution; accelerator graphs and performance measurements are separate.
 
+The experimental IRIS capture path uses the same serving dependencies plus the
+reference requirements for regenerating official CUDA traces. Setup and GPU
+acceptance commands are in ``scripts/iris/CAPTURE.md`` and
+``scripts/iris/qualify_capture_colab.ipynb``. Capture qualification is pending;
+the eager deployment remains the validated baseline.
+
 To work on the code, install from source in editable mode:
 
 .. code-block:: bash

@@ -42,6 +42,7 @@ class IrisConfig:
     game: str = "Breakout"
     max_rollout_horizon: int = 20
     max_batch_size: int = 2
+    capture_graphs: bool = False
 
     def __post_init__(self):
         if self.game != "Breakout":
@@ -50,3 +51,5 @@ class IrisConfig:
             raise ValueError("max_rollout_horizon must be an integer >= 1")
         if type(self.max_batch_size) is not int or self.max_batch_size < 1:
             raise ValueError("max_batch_size must be an integer >= 1")
+        if type(self.capture_graphs) is not bool:
+            raise ValueError("capture_graphs must be a boolean")

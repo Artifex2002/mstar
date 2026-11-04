@@ -669,6 +669,17 @@ The spec types are:
        mask for cached queries. It supports neither capture nor pre-plan, sliding
        windows, nor custom ``sm_scale``. It is for numerical qualification, with
        no performance claim; ``AUTO`` keeps its existing selection.
+       ``TORCH_STATIC`` (YAML ``torch_static``) is a separate opt-in FP32-capable
+       capture path. It requires uniform positive query spans, one segment per
+       request per label, and contiguous NHD paged storage. Per-bucket/slot
+       buffers stage page addresses, validity and bottom-right causal masks;
+       preplanning and forced double buffering protect them from the async
+       worker. It gathers a fixed ``max_seq_len`` context and materializes scores,
+       so use it for short-context capture qualification rather than assuming a
+       fused-kernel speedup. It refuses windows, context-only attention and custom
+       ``sm_scale``. Ragged self-attention also accepts ``torch_static`` for
+       uniform independent spans, including FP32, without LSE output. See
+       ``docs/design/iris-step-05b.md`` for capture keys, padding and validation.
        ``flashinfer_backend`` selects a kernel generation: ``"auto"``, ``"fa2"`` or
        ``"fa3"`` when the FlashInfer backend is selected. ``decode_tensor_cores``
        (default ``True``) runs one-token decode rows on FlashInfer's tensor-core

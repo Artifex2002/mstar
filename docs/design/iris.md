@@ -20,8 +20,10 @@ computation, resource-step declarations and the remaining GPU acceptance checks.
 The [Step 5a walkthrough](iris-step-05.md) adds eager batching and an executable
 [CUDA qualification guide](../../scripts/iris/CUDA.md) for Colab or the cluster.
 The [server continuation](iris-step-05-server.md) adds a real HTTP/native-worker
-qualification harness and records its successful GPU run. Capture-compatible
-attention and engine-managed CUDA graphs are the next implementation gate.
+qualification harness and records its successful GPU run.
+The [Step 5b walkthrough](iris-step-05b.md) implements experimental capture-compatible
+attention and engine-managed CUDA graphs;
+[CUDA capture qualification](../../scripts/iris/CAPTURE.md) remains pending.
 
 ## Benchmark objective
 

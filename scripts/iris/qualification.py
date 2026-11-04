@@ -57,7 +57,7 @@ def decoded_rgb(raw):
 
 
 @torch.inference_mode()
-def compare_trace(checkpoint, trace, device="cpu", batch_size=2):
+def compare_trace(checkpoint, trace, device="cpu", batch_size=2, config_path=None):
     """Actual batched submodules/resources, with official samples fed back."""
     model = IrisModel(checkpoint_path=str(checkpoint), max_batch_size=batch_size)
     modules = _modules(model, device)
@@ -74,7 +74,7 @@ def compare_trace(checkpoint, trace, device="cpu", batch_size=2):
     )
     rids = list(range(1, batch_size + 1))
     try:
-        with LocalIrisEngine(model, device) as engine:
+        with LocalIrisEngine(model, device, config_path=config_path) as engine:
             for rid in rids:
                 engine.open(rid, horizon, seed=rid)
             inputs = {
