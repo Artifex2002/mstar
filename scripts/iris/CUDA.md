@@ -112,3 +112,6 @@ Inspect these before calling a run comparable with another result.
 This test deliberately uses eager reference attention and synchronizing
 diagnostics. It does **not** establish CUDA-graph correctness, native worker/API
 concurrency, model quality or a speedup. Those are separate acceptance gates.
+
+After this passes, continue with [full-server qualification](SERVER.md), which
+builds the native extension and tests the real HTTP/conductor/worker path.

@@ -570,8 +570,10 @@ Independent cache labels represent contexts re-primed from position zero.
 Completed labels remain allocated until request teardown, a documented memory
 tradeoff rather than a sliding-window replacement for the reference's refresh.
 The declarations, native graph routing and eager neural submodules are CPU-tested,
-including official-checkpoint numerical comparisons. GPU serving qualification
-is still pending; see ``docs/design/iris-step-04.md``.
+including official-checkpoint numerical comparisons. Eager CUDA numerical and
+sampling checks also passed on Tesla T4; see ``docs/design/iris-step-05.md``.
+Full-server qualification is pending, with a runnable harness described in
+``scripts/iris/SERVER.md``.
 
 ``get_node_resources`` returns a flat list of ``NodeResourceSpec`` objects. Every spec has
 these common members:

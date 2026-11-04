@@ -51,6 +51,12 @@ It includes FlashInfer for the engine sampler, while attention remains the
 eager FP32 reference backend. This diagnostic run needs no Rust build; the full
 server and native graph-runtime tests still need the installation below.
 
+For the full IRIS HTTP/conductor/native-worker qualification, install
+``.[iris,metrics]`` and rebuild the Rust extension from this checkout.
+``scripts/iris/SERVER.md`` and ``scripts/iris/qualify_server_colab.ipynb``
+provide the setup, checks and report collection commands. This remains eager
+FP32 execution; accelerator graphs and performance measurements are separate.
+
 To work on the code, install from source in editable mode:
 
 .. code-block:: bash
@@ -133,6 +139,11 @@ Model families and some output formats need extra packages, exposed as pip *extr
      - BAGEL runtime: ``transformers``, ``flashinfer-python``, ``safetensors``,
        ``einops``, ``Pillow``, ``torchvision`` / ``torchaudio`` / ``torchcodec``,
        ``huggingface-hub``, ``regex``, and ``mooncake-transfer-engine`` (RDMA transport).
+   * - ``.[iris]``
+     - IRIS eager runtime: ``flashinfer-python`` for sampling, ``ninja`` for its
+       JIT build, ``Pillow``, ``huggingface-hub`` and ``safetensors``. The last
+       package is needed by generic engine loading imports. Add ``.[metrics]``
+       for the full-server qualification harness.
    * - ``.[bagel_xpu]``
      - BAGEL runtime for Intel XPU. Pins ``vllm-xpu-kernels==0.1.15.4`` for
        batched token sampling with per-request RNG state on the device.
