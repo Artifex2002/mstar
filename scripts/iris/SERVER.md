@@ -97,6 +97,10 @@ including after any rebase that changes `rust/`.
 
 ## Acceptance checks
 
+- Before checkpoint download or GPU baseline execution, the generated server
+  config passes the conductor's real deployment validator. The serving YAML
+  declares `max_seq_len: 340`, IRIS's per-context token window; this is distinct
+  from the 20-action rollout horizon, which crosses a context refresh.
 - The pinned checkpoint runs through the local resource driver to produce a
   seeded H=20 baseline using the real image loader and output serialization.
 - A managed `mstar serve iris` process starts with its normal native graph,

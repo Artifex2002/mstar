@@ -18,10 +18,15 @@ capture and performance measurement follow once this gate passes.
    launches the production server using the existing `benchmark.eval.server.ManagedServer`
    lifecycle helper. Read `local_baseline`, `qualify`, then `suite`. The generated
    config points all four nodes to one GPU and uses the existing eager deployment.
+   `prepare_server_config` runs the conductor's actual deployment validator
+   before checkpoint download or GPU inference. The serving YAML must declare
+   `max_seq_len: 340` for the context window, separately from the action horizon.
 4. `test/modular/test_iris_server_checks.py` covers malformed/incomplete streams,
    output divergence, missing/nonidle metrics, disconnect handling on the client,
    missing-CUDA reporting, and the real CPU image-loader/serialization baseline
    when the checkpoint is cached. These CPU tests do not run a GPU server.
+   The deployment regression also validates the generated serving YAML without
+   weights; it reproduces the missing-`max_seq_len` startup failure before the fix.
 
 No worker, engine, graph-runtime or model behavior is changed by this harness.
 The `iris` installation extra supplies runtime dependencies; `metrics` is an

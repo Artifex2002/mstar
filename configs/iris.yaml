@@ -1,5 +1,7 @@
 # Eager FP32 correctness configuration; GPU serving validation is still required.
 model: "iris"
+# Tokens per world-model context; the action horizon below may span contexts.
+max_seq_len: 340
 model_kwargs:
   game: "Breakout"
   max_rollout_horizon: 20

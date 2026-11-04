@@ -34,6 +34,21 @@ from scripts.iris.server_checks import (
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def prepare_server_config(checkpoint, output):
+    from mstar.model.iris.iris_model import IrisModel
+    from mstar.validation import validate_deployment
+
+    config = yaml.safe_load((ROOT / "configs/iris.yaml").read_text())
+    config["model_kwargs"]["checkpoint_path"] = str(checkpoint.resolve())
+    config["max_concurrent_requests"] = 2
+    config_path = output / "server.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    # This is the conductor's real validation path, without loading weights or
+    # starting workers. Catch invalid deployments before the GPU baseline.
+    validate_deployment(IrisModel(**config["model_kwargs"]), config, str(config_path))
+    return config_path
+
+
 def save_arrays(path, stream):
     frames = np.frombuffer(b"".join(stream.frames), np.uint8).reshape(-1, 64, 64, 3)
     np.savez_compressed(
@@ -204,6 +219,9 @@ def qualify(args, report, save):
         "rust_extension": mstar_rust.__version__,
         "flashinfer": importlib.metadata.version("flashinfer-python"),
     }
+    report["stage"] = "deployment_validation"
+    save()
+    config_path = prepare_server_config(args.checkpoint, args.output)
     if args.download_checkpoint:
         download_checkpoint(args.checkpoint)
     report["checkpoint_sha256"] = verify_checkpoint(args.checkpoint)
@@ -215,11 +233,6 @@ def qualify(args, report, save):
     expected = local_baseline(args.checkpoint, replay, args.output / "seed.png")
     save_arrays(args.output / "local-baseline.npz", expected)
     report["local_baseline"] = expected.report()
-    config = yaml.safe_load((ROOT / "configs/iris.yaml").read_text())
-    config["model_kwargs"]["checkpoint_path"] = str(args.checkpoint)
-    config["max_concurrent_requests"] = 2
-    config_path = args.output / "server.yaml"
-    config_path.write_text(yaml.safe_dump(config))
     report["stage"] = "server_startup"
     save()
     with ManagedServer(

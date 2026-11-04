@@ -9,9 +9,10 @@ import numpy as np
 import pytest
 import requests
 import torch
+import yaml
 
 from scripts.iris import server_checks
-from scripts.iris.qualify_server import local_baseline, main, save_arrays
+from scripts.iris.qualify_server import local_baseline, main, prepare_server_config, save_arrays
 from scripts.iris.server_checks import (
     Case,
     ServerRefusalError,
@@ -184,6 +185,27 @@ def test_server_command_reports_missing_cuda_before_launch(tmp_path, monkeypatch
     report = json.loads((output / "report.json").read_text())
     assert report["status"] == "failed" and report["stage"] == "cuda_and_native_preflight"
     assert not (output / "server.log").exists()
+
+
+def test_real_server_deployment_preflight_accepts_shipped_yaml_without_weights(tmp_path, monkeypatch):
+    import triton.language as tl
+
+    # The macOS conftest stub lacks this import-time kernel annotation. No
+    # kernel runs during validation; leave real Triton types unchanged.
+    if not hasattr(tl, "int64"):
+        monkeypatch.setattr(tl, "int64", int, raising=False)
+
+    def no_load(*args, **kwargs):
+        raise AssertionError("deployment validation must not load checkpoint tensors")
+
+    monkeypatch.setattr(torch, "load", no_load)
+    checkpoint = tmp_path / "not-downloaded.pt"
+    config_path = prepare_server_config(checkpoint, tmp_path)
+    config = yaml.safe_load(config_path.read_text())
+    assert config["max_seq_len"] == 340
+    assert config["max_concurrent_requests"] == 2
+    assert config["model_kwargs"]["checkpoint_path"] == str(checkpoint)
+    assert not checkpoint.exists()
 
 
 CACHE = Path(__file__).resolve().parents[2] / ".ci-results/iris/Breakout.pt"
