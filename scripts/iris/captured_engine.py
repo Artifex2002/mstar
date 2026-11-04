@@ -111,7 +111,7 @@ class CapturedIrisEngine(LocalIrisEngine):
     @torch.inference_mode()
     def run(self, module, inputs, indices=None, draws=None, pad_to=None, preplan=False):
         if draws:
-            raise ValueError("captured sampling is real; use seeded comparisons instead of replacing graph draws")
+            raise ValueError("captured sampling is real; teacher-force copied carriers after replay instead")
         node = self.nodes[id(module)]
         infos = {rid: self.info(rid, *(indices or {}).get(rid, (0, 0))) for rid in inputs}
         metadata = {

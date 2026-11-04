@@ -32,7 +32,7 @@ class Comparisons:
         expected = torch.as_tensor(np.array(expected, copy=True))
         if not torch.isfinite(actual).all():
             raise AssertionError(f"{name}: non-finite output")
-        torch.testing.assert_close(actual, expected, rtol=rtol, atol=atol, msg=name)
+        torch.testing.assert_close(actual, expected, rtol=rtol, atol=atol, msg=lambda detail: f"{name}: {detail}")
         if actual.numel():
             self.max_abs_errors[name] = max(
                 self.max_abs_errors[name], (actual.double() - expected.double()).abs().max().item()

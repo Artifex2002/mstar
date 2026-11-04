@@ -212,15 +212,37 @@ CACHE = Path(__file__).resolve().parents[2] / ".ci-results/iris/Breakout.pt"
 
 
 @pytest.mark.skipif(not CACHE.is_file(), reason="pinned checkpoint is not cached")
-def test_baseline_uses_the_real_image_loader_and_output_serialization(tmp_path, monkeypatch):
+@pytest.mark.parametrize("capture", [False, True])
+def test_baseline_uses_matching_driver_real_image_loader_and_serialization(tmp_path, monkeypatch, capture):
     from mstar.engine.resources.sampler.resource import SamplerResource
+    from scripts.iris.local_engine import LocalIrisEngine
+
+    selected = []
+    if capture:
+        import triton.language as tl
+
+        if not hasattr(tl, "int64"):
+            monkeypatch.setattr(tl, "int64", int, raising=False)
+        from scripts.iris import captured_engine
+
+        def cpu_capture_standin(model, modules, device):
+            # Only driver selection is checked on CPU; real replay needs CUDA.
+            assert model.config.capture_graphs and model.config.max_batch_size == 2
+            assert all(module.capture_graphs for module in modules.values())
+            selected.append("captured")
+            return LocalIrisEngine(model, device)
+
+        monkeypatch.setattr(captured_engine, "CapturedIrisEngine", cpu_capture_standin)
 
     monkeypatch.setattr(torch.accelerator, "is_available", lambda: False)
     monkeypatch.setattr(SamplerResource, "sample", lambda self, rids, logits: logits.argmax(-1))
     previous = torch.get_num_threads()
     torch.set_num_threads(2)
     try:
-        result = local_baseline(CACHE, Case("baseline", (0, 1), 17), tmp_path / "seed.png", device="cpu")
+        result = local_baseline(
+            CACHE, Case("baseline", (0, 1), 17), tmp_path / "seed.png", device="cpu", capture=capture
+        )
+        assert selected == (["captured"] if capture else [])
         assert result.report()["counts"] == {"video_frame": 2, "scalar": 2, "tensor": 2}
         save_arrays(tmp_path / "outputs.npz", result)
         with np.load(tmp_path / "outputs.npz", allow_pickle=False) as arrays:

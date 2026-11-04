@@ -76,6 +76,15 @@ initial-node representation adapter and rerun into a new output directory.
 Admission, replay auditing and all output-producing node comparisons remain
 strict. This diagnostic fix also needs no Rust rebuild.
 
+The `capture-check-03` run reached a sampled observation-token mismatch.
+The original gate incorrectly required identical seeded draws from eager and
+captured execution. In `sample_accelerator_graphable_gpu`, M* uses `fused_sample`
+for these small vocabularies, while eager `_sample_cuda` uses FlashInfer. The
+sampler implementation explicitly documents different draws for the same seed.
+This explains why token identity is not a valid cross-path acceptance contract;
+it does not by itself prove that captured logits or cache state are correct.
+Update the branch and retry as `capture-check-04`. No Rust rebuild is needed.
+
 ## What a pass establishes
 
 1. On CUDA, `torch_static` matches fresh official traces at B=1/B=2 through
@@ -84,21 +93,30 @@ strict. This diagnostic fix also needs no Rust rebuild.
    refuses dropped buckets or any real step that falls back to eager. Its audit
    wraps the real runner's `run_forward`, which stages inputs and calls replay;
    it records calls by node and slot.
-3. Captured rollouts match an uncaptured `torch_static` run with the same
-   checkpoint, inputs, precision and sampler seeds. H=20/H=2 exercises departure,
-   both slots, preplanning and context refresh. A reused handle runs H=1 using
-   a deliberately padded B=2 replay. World carriers/rewards/endings must match
-   exactly; RGB24 may differ by at most one intensity level.
-4. The subsequent real HTTP/conductor/async-worker run exercises the same
+3. Captured hidden states and logits match the fresh official trace under
+   teacher forcing (`rtol=2e-5`, `atol=1e-5`). A diagnostic world submodule returns
+   these tensors as graph outputs, so replayed values are actually inspected.
+   Real sampler draws execute and are checked for valid ranges and untouched
+   carrier columns. Only the copied carriers fed into the next step receive the
+   official samples. Decoded RGB24 must match within one intensity level.
+4. Separate free-running captured rollouts repeat exactly with the same seeds
+   and schedule after teardown. H=20/H=2 exercises departure, both slots,
+   preplanning and context refresh. A reused handle runs H=1 in a deliberately
+   padded B=2 replay. RNG counters must equal 16 observation draws and one
+   reward/ending draw per frame, and request sampler registrations and KV pages
+   must be released. Eager-versus-captured sampled token identity is not required.
+5. The subsequent real HTTP/conductor/async-worker run exercises the same
    server cases as [SERVER.md](SERVER.md). It sets the existing
    `MSTAR_REQUIRE_ACCELERATOR_GRAPHS=1` only in that child server's environment,
-   so missing declared capture buckets fail startup.
+   so missing declared capture buckets fail startup. Its standalone baseline
+   also uses the real captured engine with ordinary production submodules;
+   it must use the same sampler algorithm as the captured server.
 
 The direct driver synchronizes comparisons and clones outputs for diagnostic
-ownership. Its runtime is not a performance baseline. Official trace checks
-and seeded capture-versus-eager checks answer different questions; report both.
-If a seeded sequence diverges, retain its failing stage and investigate rather
-than relaxing correctness checks without numerical evidence.
+ownership. Its runtime is not a performance baseline. Numerical parity and
+sampling repeatability answer different questions; report both. Failures retain
+frame/tick/request context and numerical difference details. These checks do not
+replace statistical sampler tests or benchmark output-quality evaluation.
 
 The next gate is a controlled benchmark under `benchmark/`: official PyTorch,
 M* eager, and validated M* captured execution, with matching workloads, warmup,

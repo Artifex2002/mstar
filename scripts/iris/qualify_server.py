@@ -57,13 +57,13 @@ def save_arrays(path, stream):
 
 
 @torch.inference_mode()
-def local_baseline(checkpoint, case, image_path, device="cuda"):
+def local_baseline(checkpoint, case, image_path, device="cuda", capture=False):
     from mstar.model.iris.config import IMAGE_DECODER, IMAGE_ENCODER, INITIAL_DECODER, WORLD_MODEL
     from mstar.model.iris.graph import frame_calls
     from mstar.model.iris.iris_model import IrisModel
     from scripts.iris.local_engine import LocalIrisEngine
 
-    model = IrisModel(checkpoint_path=str(checkpoint), max_batch_size=1)
+    model = IrisModel(checkpoint_path=str(checkpoint), max_batch_size=2 if capture else 1, capture_graphs=capture)
     modules = {
         node: model.get_submodule(node, device) for node in (IMAGE_ENCODER, WORLD_MODEL, IMAGE_DECODER, INITIAL_DECODER)
     }
@@ -79,7 +79,13 @@ def local_baseline(checkpoint, case, image_path, device="cuda"):
     image = prepared.new_input_tensors["initial_image"][0].to(device)
     actions = prepared.new_input_tensors["actions"][0].to(device)
     check = StreamCheck(len(case.actions))
-    with LocalIrisEngine(model, device) as engine:
+    if capture:
+        from scripts.iris.captured_engine import CapturedIrisEngine
+
+        driver = CapturedIrisEngine(model, modules, device)
+    else:
+        driver = LocalIrisEngine(model, device)
+    with driver as engine:
         engine.open(1, len(case.actions), seed=case.seed)
         carry = engine.run(modules[IMAGE_ENCODER], {1: {"initial_image": [image]}})
         engine.run(modules[INITIAL_DECODER], carry)
@@ -232,9 +238,12 @@ def qualify(args, report, save):
     report["stage"] = "local_seeded_baseline"
     save()
     torch.set_num_threads(2)
-    expected = local_baseline(args.checkpoint, replay, args.output / "seed.png")
+    expected = local_baseline(args.checkpoint, replay, args.output / "seed.png", capture=captured)
     save_arrays(args.output / "local-baseline.npz", expected)
-    report["local_baseline"] = expected.report()
+    report["local_baseline"] = {
+        **expected.report(),
+        "execution": "engine-managed capture (same sampler as captured server)" if captured else "eager",
+    }
     report["stage"] = "server_startup"
     save()
     with ManagedServer(

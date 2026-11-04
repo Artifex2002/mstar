@@ -76,8 +76,8 @@ claim of CUDA execution or a full CPU Core CI run.
 not a second capture implementation. It audits real runner replay calls, tests
 padding through an actual engine lease, and fails on eager fallback.
 `qualify_capture.py` first compares CUDA static-attention results with fresh
-official traces, then checks real capture/replay, request departure, preplanning
-and handle reuse against static eager execution. Finally rerun the server with
+official traces, then checks real capture/replay numerics under shared official
+inputs, request departure, preplanning and handle reuse. Finally rerun the server with
 the capture config to check the actual asynchronous worker.
 
 A reported CUDA attempt completed the numerical stage, then failed at engine
@@ -97,6 +97,30 @@ the actual `Engine._collect_outputs` for eager and captured addressing and
 reproduces the empty mapping. Unexpected initial output data and missing rows
 on output-producing nodes still fail. Complete CUDA rollout replay remains
 pending its rerun.
+
+The next attempt reached `world_model/1/observation_tokens` disagreement. The
+gate was requiring identical seeded draws across algorithms, which is not M*'s
+sampler contract: `sample_accelerator_graphable_gpu` uses `fused_sample` for
+IRIS's vocabularies (512/3/2), whereas eager `_sample_cuda` uses FlashInfer.
+The sampler's docstring explicitly says those draws differ for the same seed.
+The mismatch alone therefore cannot establish a neural or cache error.
+
+The corrected diagnostic returns hidden states and logits as captured graph
+outputs and compares them directly with the official trace before feeding back
+official samples in copied carriers. Numerical tolerances are unchanged. Real
+sampling still executes; range, carrier preservation, RNG-counter and teardown
+checks remain active. Separate free-running captured trajectories must repeat
+exactly after handle reuse. The captured HTTP gate now uses a captured local
+baseline with the same sampling algorithm. CPU regressions exercise real IRIS
+submodules/resources with both argmax and argmin draws: shared-input numerical
+parity passes for both, while perturbed logits, invalid draws and corruption of
+untouched carrier columns fail with step context. CUDA qualification of these
+corrected checks is still pending.
+
+For this correction, 52 focused CPU tests passed on macOS with PyTorch 2.12.1
+and `OMP_NUM_THREADS=2`, including cached-checkpoint numerical tests, real sampler
+buffer reset checks and server-baseline selection. `ruff check .` and
+`git diff --check` passed. These results do not exercise CUDA replay.
 
 ## What to learn
 

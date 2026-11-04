@@ -19,84 +19,123 @@ CAPTURE_CONFIG = ROOT / "configs/iris_capture.yaml"
 
 
 @torch.inference_mode()
-def replay_scenarios(captured, eager, modules, reference_modules):
-    from mstar.model.iris.config import IMAGE_DECODER, IMAGE_ENCODER, INITIAL_DECODER, WORLD_KV, WORLD_MODEL
+def replay_scenarios(captured, modules, trace, stage):
+    from mstar.model.iris.config import (
+        ENDING_SAMPLER,
+        IMAGE_DECODER,
+        IMAGE_ENCODER,
+        INITIAL_DECODER,
+        OBSERVATION_SAMPLER,
+        REWARD_SAMPLER,
+        WORLD_KV,
+        WORLD_MODEL,
+        WORLD_POS,
+    )
     from mstar.model.iris.graph import frame_calls
+    from scripts.iris.capture_checks import (
+        check_decoded,
+        check_rng_offsets,
+        checked_world_outputs,
+        output_digests,
+    )
+    from scripts.iris.qualification import Comparisons
 
-    max_rgb_error, compared, padded_steps, preplanned_steps = 0, 0, 0, 0
+    comparisons = Comparisons()
+    max_rgb_error, padded_steps, preplanned_steps = 0, 0, 0
+    counters = {}
+    device = captured.device
 
-    def run_pair(node, left, right, indices=None, padded=False):
-        nonlocal max_rgb_error, compared, padded_steps, preplanned_steps
-        preplan = node == WORLD_MODEL
-        actual = captured.run(modules[node], left, indices, pad_to=2 if padded else None, preplan=preplan)
-        expected = eager.run(reference_modules[node], right, indices)
-        padded_steps += int(padded)
-        preplanned_steps += int(preplan)
-        assert actual.keys() == expected.keys()
-        for rid in actual:
-            assert actual[rid].keys() == expected[rid].keys()
-            for name in actual[rid]:
-                a, b = actual[rid][name][0], expected[rid][name][0]
-                if name == "frames":
-                    error = (a.to(torch.int16) - b.to(torch.int16)).abs().max().item()
-                    max_rgb_error = max(max_rgb_error, error)
-                    if error > 1:
-                        raise AssertionError(f"{node}/{rid}: RGB24 error {error}")
-                else:
-                    torch.testing.assert_close(a, b, rtol=0, atol=0, msg=f"{node}/{rid}/{name}")
-                compared += 1
-        return actual, expected
+    def trajectory(horizons, teacher_forced, padded=False):
+        nonlocal max_rgb_error, padded_steps, preplanned_steps
+        fingerprints = {}
+        forcing = trace if teacher_forced else None
 
-    def trajectory(horizons, padded=False):
+        def run(node, inputs, indices=None):
+            nonlocal padded_steps, preplanned_steps
+            preplan = node == WORLD_MODEL
+            output = captured.run(modules[node], inputs, indices, pad_to=2 if padded else None, preplan=preplan)
+            padded_steps += int(padded)
+            preplanned_steps += int(preplan)
+            context = f"schedule={tuple(horizons.items())}/padded={padded}/{node}/{indices or 'initial'}"
+            fingerprints.update(output_digests(output, context))
+            return output
+
         for rid, horizon in horizons.items():
             captured.open(rid, horizon, seed=10 + rid)
-            eager.open(rid, horizon, seed=10 + rid)
-        actions = {rid: torch.arange(horizon, device="cuda") % 4 for rid, horizon in horizons.items()}
+        actions = {
+            rid: torch.from_numpy(trace["input/actions"][rid - 1, :horizon].copy()).to(device)
+            for rid, horizon in horizons.items()
+        }
         inputs = {
-            rid: {"initial_image": [torch.linspace(0, 1, 3 * 64 * 64, device="cuda").reshape(3, 64, 64)]}
+            rid: {"initial_image": [torch.from_numpy(trace["initial/observations"][rid - 1].copy()).to(device)]}
             for rid in horizons
         }
-        left, right = run_pair(IMAGE_ENCODER, inputs, inputs, padded=padded)
-        run_pair(INITIAL_DECODER, left, right, padded=padded)
+        carry = run(IMAGE_ENCODER, inputs)
+        for rid, values in carry.items():
+            comparisons.check("encoder_codes", values["observation_tokens"][0], trace["initial/tokens"][rid - 1], 0, 0)
+        run(INITIAL_DECODER, carry)
+        call_number = 0
         for frame in range(max(horizons.values())):
-            for tick in range(len(frame_calls(frame))):
-                indices = {rid: (frame, tick) for rid in left}
-                left, right = run_pair(
-                    WORLD_MODEL,
-                    {rid: {**values, "actions": [actions[rid]]} for rid, values in left.items()},
-                    {rid: {**values, "actions": [actions[rid]]} for rid, values in right.items()},
-                    indices,
-                    padded,
+            for tick, call in enumerate(frame_calls(frame)):
+                indices = {rid: (frame, tick) for rid in carry}
+                output = run(
+                    WORLD_MODEL, {rid: {**values, "actions": [actions[rid]]} for rid, values in carry.items()}, indices
                 )
-            decoded, _ = run_pair(IMAGE_DECODER, left, right, padded=padded)
-            assert all(tuple(values["frames"][0].shape) == (1, 64, 64, 3) for values in decoded.values())
-            for rid in list(left):
+                carry = checked_world_outputs(output, carry, frame, tick, call_number, comparisons, forcing)
+                for rid in carry:
+                    expected = int(trace[f"call/{call_number:04}/cache_size"])
+                    actual = captured.resources[WORLD_POS].position(rid, call.label)
+                    assert actual == expected, (
+                        f"frame={frame} tick={tick} request={rid}: position {actual} != {expected}"
+                    )
+                call_number += 1
+            decoded = run(IMAGE_DECODER, carry, {rid: (frame, 0) for rid in carry})
+            max_rgb_error = max(max_rgb_error, check_decoded(decoded, carry, frame, forcing))
+            for rid in list(carry):
                 if frame + 1 == horizons[rid]:
+                    counters[f"H{horizons[rid]}"] = check_rng_offsets(captured, rid, frame + 1)
                     captured.close(rid)
-                    eager.close(rid)
-                    del left[rid], right[rid]
+                    for key in (OBSERVATION_SAMPLER, REWARD_SAMPLER, ENDING_SAMPLER):
+                        resource = captured.resources[key]
+                        assert rid not in resource._sampler._sampling_config
+                        assert rid not in resource._cg_buffers._rid_to_slot
+                    del carry[rid]
+        counts = captured.resources[WORLD_KV].page_counts()
+        assert counts.used == counts.cached == 0
+        return fingerprints
 
-    # Real RNG draws, context refresh, two -> one row departure, then handle
-    # reuse at one row replaying the two-row bucket (a real padded replay).
-    trajectory({1: 20, 2: 2})
-    trajectory({1: 1}, padded=True)
-    counts = captured.resources[WORLD_KV].page_counts()
-    assert counts.used == counts.cached == 0
+    # Numerical parity uses identical official inputs, independent of which valid
+    # token each sampler draws. The real draws still execute and advance counters.
+    stage("captured_teacher_forced_parity")
+    trajectory({1: 20, 2: 2}, teacher_forced=True)
+    trajectory({1: 1}, teacher_forced=True, padded=True)
+    # Repeat the same captured algorithm and schedule after teardown/handle reuse.
+    stage("captured_sampling_first_run")
+    first = trajectory({1: 20, 2: 2}, teacher_forced=False)
+    first.update(trajectory({1: 1}, teacher_forced=False, padded=True))
+    stage("captured_sampling_repeat")
+    second = trajectory({1: 20, 2: 2}, teacher_forced=False)
+    second.update(trajectory({1: 1}, teacher_forced=False, padded=True))
+    assert first.keys() == second.keys()
+    for name in first:
+        assert first[name] == second[name], f"captured sampling repeat mismatch: {name}"
     assert padded_steps and preplanned_steps
     for node in modules:
         assert captured.replays[node] > 0
     assert captured.slots[f"{WORLD_MODEL}:0"] and captured.slots[f"{WORLD_MODEL}:1"]
     return {
-        "tensor_outputs_compared": compared,
+        "teacher_forced_official_parity": comparisons.report(),
         "max_rgb24_error": max_rgb_error,
-        "world_carriers_rewards_endings": "exact",
+        "captured_sampling_repeatability": {"status": "exact", "tensor_fingerprints_compared": len(first)},
+        "cross_algorithm_seed_identity": "not required: eager FlashInfer and captured fused_sample differ",
+        "rng_counters": counters,
         "horizons": [20, 2],
         "handle_reuse": "passed",
         "padded_replays": padded_steps,
         "preplanned_world_steps": preplanned_steps,
         "engine_run_forward_calls": dict(captured.replays),
         "replay_slots": dict(captured.slots),
-        "kv_pages_after_cleanup": {"used": counts.used, "cached": counts.cached},
+        "kv_pages_after_cleanup": {"used": 0, "cached": 0},
     }
 
 
@@ -108,9 +147,10 @@ def qualify(args, report, save):
     import mstar_rust
 
     from mstar.engine.fp32_precision import Fp32Precision, fp32_precision_scope
+    from mstar.model.iris.config import WORLD_MODEL
     from mstar.model.iris.iris_model import IrisModel
+    from scripts.iris.capture_checks import DiagnosticWorldSubmodule
     from scripts.iris.captured_engine import CapturedIrisEngine
-    from scripts.iris.local_engine import LocalIrisEngine
     from scripts.iris.qualification import _modules, compare_trace
 
     report["hardware"] = {
@@ -154,14 +194,18 @@ def qualify(args, report, save):
         report["stage"] = "engine_capture"
         save()
         model = IrisModel(checkpoint_path=str(args.checkpoint), capture_graphs=True)
-        reference_model = IrisModel(checkpoint_path=str(args.checkpoint))
-        modules, reference_modules = _modules(model, "cuda"), _modules(reference_model, "cuda")
-        with LocalIrisEngine(reference_model, "cuda", CAPTURE_CONFIG) as eager:
-            with CapturedIrisEngine(model, modules) as captured:
-                report["captures"] = captured.captures
-                report["stage"] = "engine_replay"
+        modules = _modules(model, "cuda")
+        modules[WORLD_MODEL] = DiagnosticWorldSubmodule(modules[WORLD_MODEL].network, 20, capture_graphs=True)
+        with np.load(args.output / "official-batch-2/trace.npz", allow_pickle=False) as data:
+            trace = dict(data)
+        with CapturedIrisEngine(model, modules) as captured:
+            report["captures"] = captured.captures
+
+            def stage(name):
+                report["stage"] = name
                 save()
-                report["replay"] = replay_scenarios(captured, eager, modules, reference_modules)
+
+            report["replay"] = replay_scenarios(captured, modules, trace, stage)
     report.update(status="passed", stage="complete")
     save()
 
