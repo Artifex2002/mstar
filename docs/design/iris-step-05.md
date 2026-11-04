@@ -117,6 +117,14 @@ native Rust routing tests. Ruff, formatting and `git diff --check` passed. The
 broader local-environment failures on clean `main` are documented in Step 4;
 this is not a claim that the entire CPU Core suite passed.
 
-The CUDA command has not been run locally; this machine has no NVIDIA GPU.
-Passing CPU tests and a prepared Colab notebook are not a CUDA qualification
-result. The next acceptance gate is the report from that run.
+The user ran the CUDA command successfully on Colab's Tesla T4 at clean commit
+`caf2f45a`, with PyTorch 2.12.1+cu132, Triton 3.7.1 and FlashInfer 0.7.2.
+The [qualification record](iris-t4-qualification.json) retains the report's
+results and the original artifact's SHA256. It is a user-provided run, not an
+independent rerun on this local machine.
+
+Both B=1 and B=2 passed all 342 world calls through context refresh. Encoder
+codes matched exactly; maximum observation-logit error was `1.5258789e-05`, and
+maximum predicted-RGB error was `1.1146069e-05`. Actual sampling passed both
+batch cases, request departure and handle reuse. Full server/native-worker
+execution and performance remain separate acceptance gates. CUDA graphs stayed off.

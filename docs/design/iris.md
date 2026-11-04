@@ -3,8 +3,10 @@
 Status: `codex/iris` is the implementation branch, based on `main`. The official
 reference harness is executable, and M* registration, the CPU request contract,
 resource declarations, computation graph and batched eager FP32 neural submodules are
-implemented. CPU numerical checks pass against the official checkpoint; CUDA
-sampling, full server execution and performance are not yet qualified. The learner can
+implemented. CPU checks and eager CUDA numerical/sampling qualification pass;
+the user-provided [Tesla T4 report](iris-t4-qualification.json) records clean
+commit `caf2f45a`, PyTorch 2.12.1+cu132 and FlashInfer 0.7.2. Full server
+execution, CUDA graphs and performance are not yet qualified. The learner can
 repeat the changes independently on an `iris` branch using the
 [Step 1 lesson](iris-step-01.md).
 Continue with the [Step 2 contract walkthrough](iris-step-02.md).
