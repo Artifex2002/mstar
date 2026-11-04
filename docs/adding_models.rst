@@ -562,6 +562,16 @@ model side is needed for this.
 Step 2a — Declare your resources
 --------------------------------
 
+IRIS's development scaffold provides a worked declaration example in
+``mstar/model/iris/resources.py`` and ``docs/design/iris-step-02a.md``. Its
+world-model node declares paged KV, attention, learned-position IDs and three
+categorical samplers; its tokenizer nodes declare cacheless spatial attention.
+Independent cache labels represent contexts re-primed from position zero.
+Completed labels remain allocated until request teardown, a documented memory
+tradeoff rather than a sliding-window replacement for the reference's refresh.
+The declarations are CPU-tested; the graph, submodules and GPU qualification
+are still under development.
+
 ``get_node_resources`` returns a flat list of ``NodeResourceSpec`` objects. Every spec has
 these common members:
 

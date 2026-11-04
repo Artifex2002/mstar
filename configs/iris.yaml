@@ -6,3 +6,8 @@ model_kwargs:
 node_groups:
   - node_names: [image_encoder, world_model, image_decoder]
     ranks: [0]
+resources:
+  world_kv:
+    page_size: 16
+    max_num_pages: 64
+    prefix_cache: false

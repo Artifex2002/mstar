@@ -9,7 +9,7 @@ import torch
 
 from mstar.conductor.request_info import DEFAULT_PARTITION
 from mstar.graph.base import TensorPointerInfo
-from mstar.model.iris.config import IMAGE_SHAPE, OUTPUT_MODALITIES, ROLLOUT_LOOP
+from mstar.model.iris.config import IMAGE_SHAPE, OUTPUT_MODALITIES, ROLLOUT_LOOP, WORLD_KV
 from mstar.model.iris.iris_model import IrisModel
 from mstar.model.multimodal import PromptPart
 from mstar.model.registry import get_model_class, model_init_kwargs
@@ -80,13 +80,14 @@ def test_bad_deployment_options(options):
 
 def test_preparation_moves_bulk_actions_to_tensor_edges(model):
     result = _prepare(model, iris_horizon=999)
-    assert result.metadata == {"iris_horizon": 3}
+    assert result.metadata["iris_horizon"] == 3
+    assert result.metadata["kv_layout"][WORLD_KV]["epoch_0"].spans[0].length == 67
     assert result.new_input_tensors["image_inputs"] == []
     assert result.new_input_tensors["initial_image"][0].shape == IMAGE_SHAPE
     assert torch.equal(result.new_input_tensors["actions"][0], torch.tensor([0, 1, 3]))
     assert "actions" in model.PREPROCESS_ONLY_KWARGS
     assert "iris_horizon" in model.INTERNAL_KWARGS
-    assert json.loads(json.dumps(result.metadata)) == result.metadata
+    assert json.loads(json.dumps(result.metadata["iris_horizon"])) == 3
 
 
 def test_real_data_worker_handoff_removes_bulk_kwargs_and_overwrites_client_horizon(model, tmp_path):
@@ -127,7 +128,10 @@ def test_real_data_worker_handoff_removes_bulk_kwargs_and_overwrites_client_hori
     worker._finish_input(request, prepared, None)
     entity, message = sent[0]
     assert entity == "conductor"
-    assert message.body.model_kwargs == {"iris_horizon": 2, "seed": 7}
+    assert set(message.body.model_kwargs) == {"iris_horizon", "seed", "kv_layout"}
+    assert message.body.model_kwargs["iris_horizon"] == 2
+    assert message.body.model_kwargs["kv_layout"][WORLD_KV]["epoch_0"][0][0][:2] == [50, 50]
+    json.dumps(message.body.model_kwargs)
     assert message.body.initial_signals["actions"][0].dims == [2]
     assert worker.request_model_kwargs["iris-test"]["actions"] is actions
     assert request.model_kwargs["iris_horizon"] == 999
@@ -282,8 +286,7 @@ def test_output_schema_errors_are_explicit(model, output, modality):
 
 
 def test_unimplemented_execution_is_explicit_and_dummy_mode_still_works(model):
-    with pytest.raises(NotImplementedError, match="resource"):
-        model.get_node_resources()
+    assert len(model.get_node_resources()) == 8
     with pytest.raises(NotImplementedError, match="graph"):
         model.get_graph_walk_graphs()
     with pytest.raises(NotImplementedError, match="submodules"):

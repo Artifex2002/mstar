@@ -3,7 +3,7 @@
 Implemented on `codex/iris`, following step 2 of `docs/adding_models.rst`.
 Step 1 is commit `69f05b7f`, rebased onto upstream/fork `main` at `a9e81ed8`
 and pushed to `origin/codex/iris`. This contract, benchmark plan and reference
-tooling form the next commit on that branch.
+tooling were committed and pushed as `8cae2069`.
 
 ## What now works
 
@@ -11,8 +11,8 @@ tooling form the next commit on that branch.
 package. Its real methods validate a request, create the initial conductor
 arguments, report completion of the planned walk, and encode output tensors.
 
-Resource declarations, the computation graph and real submodule loading raise
-`NotImplementedError`. Dummy submodule lookup returns `None` for the three known
+At the Step 2 commit, resource declarations, the computation graph and real
+submodule loading raise `NotImplementedError`. Dummy submodule lookup returns `None` for the three known
 nodes. This is a CPU-tested contract, not a runnable IRIS server.
 
 ## First read these paths
@@ -182,6 +182,8 @@ Next is step 2a: inspect and declare KV storage, causal attention, learned
 positions and sampling, including the context-refresh boundary and tokenizer's
 spatial attention. Resource lifecycle work follows `.claude/skills/engine-resources/SKILL.md`.
 Graph declarations follow in step 3, and neural computation/loading in step 4.
+The subsequent [Step 2a implementation](iris-step-02a.md) adds resource declarations
+and `kv_layout` metadata to the original contract shown here.
 
 For learning, explain why the data worker handles real tensors while the conductor
 handles descriptors, why the image has no batch dimension here, why H is derived

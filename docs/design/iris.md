@@ -2,10 +2,12 @@
 
 Status: `codex/iris` is the implementation branch, based on `main`. The official
 reference harness is executable, and M* registration and the CPU request
-contract are implemented. M* inference is not implemented yet. The learner can
+contract and resource declarations are implemented. M* inference is not implemented yet. The learner can
 repeat the changes independently on an `iris` branch using the
 [Step 1 lesson](iris-step-01.md).
 Continue with the [Step 2 contract walkthrough](iris-step-02.md).
+Resource declarations and the context-storage tradeoff are explained in
+[Step 2a](iris-step-02a.md).
 
 ## Benchmark objective
 

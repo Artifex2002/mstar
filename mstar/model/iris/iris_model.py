@@ -6,21 +6,26 @@ from mstar.conductor.request_info import (
     CurrentForwardConductorMetadata,
     StreamingConnectionState,
 )
-from mstar.engine.resources import NodeResourceSpec
+from mstar.engine.resources import KVReqConfig, NodeResourceSpec, ResourceReqConfig, SamplingReqConfig
 from mstar.graph.base import GraphEdge, GraphSection, TensorPointerInfo
-from mstar.model.base import ForwardPassArgs, Model, ProcessPromptOutput
+from mstar.model.base import ForwardPassArgs, KVLabel, Model, ProcessPromptOutput
 from mstar.model.iris.config import (
+    ENDING_SAMPLER,
     HF_REPO,
     IMAGE_DECODER,
     IMAGE_ENCODER,
     IMAGE_SHAPE,
     IMAGINE_WALK,
     NUM_ACTIONS,
+    OBSERVATION_SAMPLER,
     OUTPUT_MODALITIES,
+    REWARD_SAMPLER,
     ROLLOUT_LOOP,
+    WORLD_KV,
     WORLD_MODEL,
     IrisConfig,
 )
+from mstar.model.iris.resources import context_epochs, iris_resources, request_kv_layout
 from mstar.model.multimodal import PromptPart
 
 
@@ -113,7 +118,7 @@ class IrisModel(Model):
                 "initial_image": [image.contiguous()],
                 "actions": [actions.contiguous()],
             },
-            metadata={"iris_horizon": actions.numel()},
+            metadata={"iris_horizon": actions.numel(), "kv_layout": request_kv_layout(actions.numel())},
         )
 
     def _horizon(self, model_kwargs: dict | None) -> int:
@@ -210,7 +215,34 @@ class IrisModel(Model):
         return output.contiguous().numpy().tobytes()
 
     def get_node_resources(self) -> list[NodeResourceSpec]:
-        raise NotImplementedError("IRIS resource declarations are not implemented yet")
+        return iris_resources()
+
+    def kv_labels(self) -> dict[str, dict[str, KVLabel]]:
+        return {WORLD_KV: {epoch.label: KVLabel() for epoch in context_epochs(self.config.max_rollout_horizon)}}
+
+    def get_request_resource_configs(
+        self,
+        partition_fwd_args: dict[str, ForwardPassArgs],
+        model_kwargs: dict | None = None,
+    ) -> dict[str, ResourceReqConfig]:
+        horizon = self._horizon(model_kwargs)
+        configs: dict[str, ResourceReqConfig] = {
+            WORLD_KV: KVReqConfig(
+                needed_labels=[epoch.label for epoch in context_epochs(horizon)],
+                prefix_cache=False,
+            ),
+        }
+        # The reference samples unfiltered Categorical(logits=...), at T=1.
+        for key in (OBSERVATION_SAMPLER, REWARD_SAMPLER, ENDING_SAMPLER):
+            configs[key] = SamplingReqConfig(
+                temperature=1.0,
+                top_k=0,
+                top_p=1.0,
+                repetition_penalty=1.0,
+                ignore_eos=True,
+                penalize_prompt=False,
+            )
+        return configs
 
     def get_graph_walk_graphs(self) -> dict[str, GraphSection]:
         raise NotImplementedError("IRIS computation graph is not implemented yet")
