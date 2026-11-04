@@ -180,7 +180,7 @@ class WorldNetwork(nn.Module):
 
     def forward(self, tokens, positions, call, attend):
         embedding = self.action_embedding if call.kind == "action" else self.observation_embedding
-        x = embedding(tokens) + self.pos_emb(positions)
+        x = embedding(tokens) + self.pos_emb(positions.reshape(tokens.shape))
         for layer, block in enumerate(self.blocks):
             x = block(x, layer, attend)
         x = self.ln_f(x)

@@ -20,7 +20,7 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
    * - ``iris`` *(Development)*
      - ``eloialonso/iris`` (``pretrained_models/Breakout.pt``)
      - IRIS Transformer world-model integration: Breakout supplied-action request
-       contract, resources, graph and eager FP32 submodules implemented. Official
+       contract, resources, graph and batched eager FP32 submodules implemented. Official
        checkpoint parity checked on CPU; GPU serving and performance remain unvalidated.
    * - ``chatterbox`` / ``chatterbox_multilingual`` / ``chatterbox_turbo``
      - ``ResembleAI/chatterbox``, ``ResembleAI/chatterbox-turbo``

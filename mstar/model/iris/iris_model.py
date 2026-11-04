@@ -49,8 +49,9 @@ class IrisModel(Model):
         max_rollout_horizon: int = 20,
         skip_weight_loading: bool = False,
         checkpoint_path: str | None = None,
+        max_batch_size: int = 2,
     ):
-        self.config = IrisConfig(game=game, max_rollout_horizon=max_rollout_horizon)
+        self.config = IrisConfig(game=game, max_rollout_horizon=max_rollout_horizon, max_batch_size=max_batch_size)
         self.model_path_hf = model_path_hf
         self.cache_dir = cache_dir
         self.skip_weight_loading = skip_weight_loading
@@ -281,10 +282,13 @@ class IrisModel(Model):
                 self._networks[device] = load_networks(path, device)
             networks = self._networks[device]
             if node_name == WORLD_MODEL:
-                module = WorldSubmodule(networks.world, self.config.max_rollout_horizon)
+                module = WorldSubmodule(networks.world, self.config.max_rollout_horizon, self.config.max_batch_size)
             else:
                 module = ImageSubmodule(
-                    networks.tokenizer, decode=node_name != IMAGE_ENCODER, initial=node_name == INITIAL_DECODER
+                    networks.tokenizer,
+                    decode=node_name != IMAGE_ENCODER,
+                    initial=node_name == INITIAL_DECODER,
+                    max_batch_size=self.config.max_batch_size,
                 )
             self._submodules[key] = module.eval()
         return self._submodules[key]

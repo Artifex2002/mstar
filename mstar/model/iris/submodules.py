@@ -1,4 +1,4 @@
-"""Eager FP32 serving nodes for supplied-action imagination."""
+"""Batched eager FP32 serving nodes for supplied-action imagination."""
 
 import torch
 
@@ -27,13 +27,36 @@ class IrisSubmodule(NodeSubmodule):
     float32_matmul_precision = "highest"
     cudnn_allow_tf32 = False
 
+    def __init__(self, max_batch_size=2):
+        super().__init__()
+        self.batch_limit = max_batch_size
+
     def max_batch_size(self, graph_walk):
-        return 1
+        return self.batch_limit
+
+    def can_batch(self, batch, model_inputs):
+        return 0 < len(model_inputs) <= self.batch_limit
+
+    @staticmethod
+    def _row(outputs, index):
+        return {name: [value[index]] for name, value in outputs.items()}
+
+    def forward(self, graph_walk, engine_inputs, **inputs):
+        return self._row(self.forward_tensors(engine_inputs, **inputs), 0)
+
+    def forward_batched(self, graph_walk, engine_inputs, **inputs):
+        outputs = self.forward_tensors(engine_inputs, **inputs)
+        return {rid: self._row(outputs, index) for index, rid in enumerate(engine_inputs.request_ids)}
+
+    def preprocess(self, graph_walk, engine_inputs, inputs):
+        if not self.can_batch(None, inputs):
+            raise ValueError("IRIS rows have incompatible call phases or exceed max_batch_size")
+        return {name: torch.stack([row.tensor_inputs[name] for row in inputs]) for name in inputs[0].tensor_inputs}
 
 
 class ImageSubmodule(IrisSubmodule):
-    def __init__(self, tokenizer, decode=False, initial=False):
-        super().__init__()
+    def __init__(self, tokenizer, decode=False, initial=False, max_batch_size=2):
+        super().__init__(max_batch_size)
         self.decode, self.initial = decode, initial
         self.embedding = tokenizer.embedding
         if decode:
@@ -50,30 +73,30 @@ class ImageSubmodule(IrisSubmodule):
         segments = tuple(Segment(rid, f"spatial_{size}", size * size) for size in (4, 8, 16) for rid in request_ids)
         return SubmoduleStep(steps={self.attention_key: AttentionStep(segments=segments, causal=False)})
 
-    def forward(self, graph_walk, engine_inputs, **inputs):
+    def forward_tensors(self, engine_inputs, **inputs):
         attend = engine_inputs.resources[self.attention_key].run
         if not self.decode:
-            tokens = Tokenizer.encode(self, inputs["initial_image"].unsqueeze(0), attend).tokens[0]
+            tokens = Tokenizer.encode(self, inputs["initial_image"], attend).tokens
             return {
-                "observation_tokens": [tokens],
-                "reward_class": [tokens.new_ones(1)],
-                "ending_class": [tokens.new_zeros(1)],
+                "observation_tokens": tokens,
+                "reward_class": tokens.new_ones((tokens.shape[0], 1)),
+                "ending_class": tokens.new_zeros((tokens.shape[0], 1)),
             }
-        frames = Tokenizer.decode_tokens(self, inputs["observation_tokens"].unsqueeze(0), attend)
+        frames = Tokenizer.decode_tokens(self, inputs["observation_tokens"], attend)
         if self.initial:
             # Preserve the reference reset's reconstruction even though it is not emitted.
             return {}
         return {
-            **{name: [inputs[name]] for name in WORLD_CARRY},
-            "frames": [(frames * 255).to(torch.uint8).permute(0, 2, 3, 1).contiguous()],
-            "reward": [inputs["reward_class"].to(torch.float32) - 1],
-            "ending": [inputs["ending_class"].to(torch.bool)],
+            **{name: inputs[name] for name in WORLD_CARRY},
+            "frames": (frames * 255).to(torch.uint8).permute(0, 2, 3, 1).unsqueeze(1).contiguous(),
+            "reward": inputs["reward_class"].to(torch.float32) - 1,
+            "ending": inputs["ending_class"].to(torch.bool),
         }
 
 
 class WorldSubmodule(IrisSubmodule):
-    def __init__(self, network, max_horizon):
-        super().__init__()
+    def __init__(self, network, max_horizon, max_batch_size=2):
+        super().__init__(max_batch_size)
         self.network = network
         self.schedules = tuple(frame_calls(frame) for frame in range(max_horizon))
 
@@ -83,12 +106,32 @@ class WorldSubmodule(IrisSubmodule):
         if frame >= fwd_info.step_metadata["iris_horizon"] or token >= len(self.schedules[frame]):
             return None
         call = self.schedules[frame][token]
+        observation = inputs["observation_tokens"][0]
+        if call.kind == "prime":
+            tokens = observation
+        elif call.kind == "action":
+            tokens = inputs["actions"][0][frame : frame + 1]
+        else:
+            tokens = observation[call.input_index : call.input_index + 1]
         return NodeInputs(
-            tensor_inputs={name: inputs[name][0] for name in ("actions", *WORLD_CARRY)},
-            kwargs={"call": call, "frame": frame},
+            tensor_inputs={"tokens": tokens, **{name: inputs[name][0] for name in WORLD_CARRY}},
+            kwargs={"call": call},
             resource_step_info=call,
             input_seq_len=call.span,
         )
+
+    @staticmethod
+    def call_key(call):
+        return call.kind, call.label, call.sample_index
+
+    def can_batch(self, batch, model_inputs):
+        return (
+            super().can_batch(batch, model_inputs)
+            and len({self.call_key(row.resource_step_info) for row in model_inputs}) == 1
+        )
+
+    def preprocess(self, graph_walk, engine_inputs, inputs):
+        return {**super().preprocess(graph_walk, engine_inputs, inputs), "call": inputs[0].resource_step_info}
 
     def declare_step(self, graph_walk, request_ids, inputs, **kwargs):
         call = inputs[0].resource_step_info
@@ -99,6 +142,8 @@ class WorldSubmodule(IrisSubmodule):
         if call.kind == "action":
             steps[REWARD_SAMPLER] = SamplerStep(apply_penalty=False, apply_filters=False)
             steps[ENDING_SAMPLER] = SamplerStep(apply_penalty=False, apply_filters=False)
+        if not self.can_batch(None, inputs):
+            raise ValueError("IRIS cannot declare an incompatible batch")
         return SubmoduleStep(segments=segments, steps=steps)
 
     def compute(self, engine_inputs, tokens, call):
@@ -112,28 +157,22 @@ class WorldSubmodule(IrisSubmodule):
 
         return self.network(tokens, resources[WORLD_POS].pos_ids(call.label), call, attend)
 
-    def forward(self, graph_walk, engine_inputs, actions, observation_tokens, reward_class, ending_class, call, frame):
-        if call.kind == "prime":
-            tokens = observation_tokens.unsqueeze(0)
-        elif call.kind == "action":
-            tokens = actions[frame : frame + 1].unsqueeze(0)
-        else:
-            tokens = observation_tokens[call.input_index : call.input_index + 1].unsqueeze(0)
+    def forward_tensors(self, engine_inputs, tokens, observation_tokens, reward_class, ending_class, call):
         result = self.compute(engine_inputs, tokens, call)
         resources, rids = engine_inputs.resources, engine_inputs.request_ids
         if call.kind == "action":
-            reward_class = resources[REWARD_SAMPLER].sample(rids, result.logits_rewards[:, 0])
-            ending_class = resources[ENDING_SAMPLER].sample(rids, result.logits_ends[:, 0])
+            reward_class = resources[REWARD_SAMPLER].sample(rids, result.logits_rewards[:, 0]).reshape(-1, 1)
+            ending_class = resources[ENDING_SAMPLER].sample(rids, result.logits_ends[:, 0]).reshape(-1, 1)
         if call.sample_index is not None:
             # Other nodes may still read the preceding frame's carrier.
             observation_tokens = observation_tokens.clone()
-            observation_tokens[call.sample_index : call.sample_index + 1] = resources[OBSERVATION_SAMPLER].sample(
+            observation_tokens[:, call.sample_index] = resources[OBSERVATION_SAMPLER].sample(
                 rids, result.logits_observations[:, 0]
             )
         return {
-            "observation_tokens": [observation_tokens],
-            "reward_class": [reward_class],
-            "ending_class": [ending_class],
+            "observation_tokens": observation_tokens,
+            "reward_class": reward_class,
+            "ending_class": ending_class,
         }
 
     def check_stop(self, request_id, request_info, outputs):

@@ -1,8 +1,9 @@
 # IRIS Step 4 / 4a: neural submodules and declared execution
 
 This follows **Step 4 — Implement the submodules** and **Step 4a — Declare the
-step** in `docs/adding_models.rst`. Step 3 is published on `codex/iris` at
-`750df8b4`; the work described here is the next local increment.
+step** in `docs/adding_models.rst`. This describes the Step 4 checkpoint,
+published as `4eddbe16` and `36c9b856`. For subsequent batching work and the
+ready-to-run CUDA qualification command, continue with [Step 5a](iris-step-05.md).
 
 Status: eager FP32 computation and CPU numerical qualification are implemented.
 CUDA sampling, numerical GPU parity and full API-server execution still require

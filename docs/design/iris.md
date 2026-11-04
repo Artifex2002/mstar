@@ -2,7 +2,7 @@
 
 Status: `codex/iris` is the implementation branch, based on `main`. The official
 reference harness is executable, and M* registration, the CPU request contract,
-resource declarations, computation graph and eager FP32 neural submodules are
+resource declarations, computation graph and batched eager FP32 neural submodules are
 implemented. CPU numerical checks pass against the official checkpoint; CUDA
 sampling, full server execution and performance are not yet qualified. The learner can
 repeat the changes independently on an `iris` branch using the
@@ -13,6 +13,8 @@ Resource declarations and the context-storage tradeoff are explained in
 The [Step 3 walkthrough](iris-step-03.md) explains nested loops and native routing tests.
 The [Step 4 walkthrough](iris-step-04.md) covers checkpoint loading, neural
 computation, resource-step declarations and the remaining GPU acceptance checks.
+The [Step 5a walkthrough](iris-step-05.md) adds eager batching and an executable
+[CUDA qualification guide](../../scripts/iris/CUDA.md) for Colab or the cluster.
 
 ## Benchmark objective
 

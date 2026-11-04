@@ -45,6 +45,12 @@ CPU dependencies. The reference source and published checkpoint are pinned and
 kept outside tracked model code. These are development tools, not a serving
 installation for IRIS.
 
+For single-device IRIS CUDA qualification, ``scripts/iris/CUDA.md`` provides an
+isolated Python 3.12 setup using ``scripts/iris/requirements-cuda-tests.txt``.
+It includes FlashInfer for the engine sampler, while attention remains the
+eager FP32 reference backend. This diagnostic run needs no Rust build; the full
+server and native graph-runtime tests still need the installation below.
+
 To work on the code, install from source in editable mode:
 
 .. code-block:: bash

@@ -1,8 +1,12 @@
-# IRIS reference rollout harness
+# IRIS reference and qualification tooling
 
-This tool calls the external official IRIS implementation; it is not an M* model
-integration. It establishes a numerical baseline before we implement the model
+`reference_harness.py` calls the external official IRIS implementation. It
+establishes a numerical baseline for the model integrated into M*
 through the [guided contribution plan](../../docs/design/iris.md).
+
+For the new batched M* implementation, use the [CUDA qualification guide](CUDA.md)
+or `qualify_colab.ipynb`. It runs the official/M* numerical comparison on the
+same GPU, followed by actual engine sampling and request-state checks.
 
 The workload is a learned-world prediction: initial frames and supplied actions
 produce imagined frames, rewards and ending signals. No Atari emulator, ROM,

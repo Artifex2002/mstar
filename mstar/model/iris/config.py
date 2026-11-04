@@ -41,9 +41,12 @@ class IrisConfig:
 
     game: str = "Breakout"
     max_rollout_horizon: int = 20
+    max_batch_size: int = 2
 
     def __post_init__(self):
         if self.game != "Breakout":
             raise ValueError("IRIS currently supports only the pinned Breakout checkpoint")
         if type(self.max_rollout_horizon) is not int or self.max_rollout_horizon < 1:
             raise ValueError("max_rollout_horizon must be an integer >= 1")
+        if type(self.max_batch_size) is not int or self.max_batch_size < 1:
+            raise ValueError("max_batch_size must be an integer >= 1")
