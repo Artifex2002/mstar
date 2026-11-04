@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "stage": "complete",
+  "started_utc": "2026-11-04T17:39:13.669247+00:00",
+  "reference_commit": "24326aaaa283c527f42b89b44cfdecf2665a7a16",
+  "mstar_commit": "caf2f45ad777168db30a73a38f2200fc0821d1a9",
+  "working_tree_status": "",
+  "hardware": {
+    "gpu": "Tesla T4",
+    "capability": [
+      7,
+      5
+    ],
+    "torch": "2.12.1+cu132",
+    "cuda_build": "13.2",
+    "triton": "3.7.1",
+    "platform": "Linux-6.6.159+-x86_64-with-glibc2.39",
+    "flashinfer": "0.7.2"
+  },
+  "checkpoint_sha256": "169e3669b7d1901990b4ebce35ff8f3355610fae393e6a587fd62c40faf790f4",
+  "capture": "disabled: eager-only reference attention",
+  "server": "not exercised",
+  "tolerances": {
+    "world_rtol": 2e-05,
+    "world_atol": 1e-05,
+    "rgb_rtol": 2e-05,
+    "rgb_atol": 5e-05,
+    "codes_rewards_endings": "exact",
+    "rgb24_max_absolute_error": 1
+  },
+  "parity": [
+    {
+      "batch_size": 1,
+      "horizon": 20,
+      "decoded_frames": 20,
+      "world_batch_calls": 342,
+      "world_row_calls": 342,
+      "tensors_checked": 1430,
+      "max_abs_errors": {
+        "encoder_codes": 0,
+        "initial_rgb": 2.682209014892578e-07,
+        "output_sequence": 0,
+        "logits_observations": 0,
+        "logits_rewards": 0,
+        "logits_ends": 0,
+        "predicted_rgb": 1.1146068572998047e-05,
+        "reward": 0,
+        "ending": 0
+      }
+    },
+    {
+      "batch_size": 2,
+      "horizon": 20,
+      "decoded_frames": 40,
+      "world_batch_calls": 342,
+      "world_row_calls": 684,
+      "tensors_checked": 1470,
+      "max_abs_errors": {
+        "encoder_codes": 0,
+        "initial_rgb": 5.543231964111328e-06,
+        "output_sequence": 0,
+        "logits_observations": 1.52587890625e-05,
+        "logits_rewards": 0,
+        "logits_ends": 0,
+        "predicted_rgb": 1.0132789611816406e-05,
+        "reward": 0,
+        "ending": 0
+      }
+    }
+  ],
+  "sampling": [
+    {
+      "batch_size": 1,
+      "decoded_frames_by_request": {
+        "1": 20
+      },
+      "handle_reuse": "passed"
+    },
+    {
+      "batch_size": 2,
+      "decoded_frames_by_request": {
+        "1": 20,
+        "2": 2
+      },
+      "handle_reuse": "passed"
+    }
+  ],
+  "provenance": {
+    "kind": "user-provided Colab qualification report",
+    "source_sha256": "61c31a685504c1dfbba410d151a57cd6b99480c36420479422155688c39ad044"
+  }
+}
