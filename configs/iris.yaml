@@ -1,0 +1,7 @@
+# Development scaffold: real inference is not implemented yet.
+model: "iris"
+model_kwargs:
+  game: "Breakout"
+node_groups:
+  - node_names: [image_encoder, world_model, image_decoder]
+    ranks: [0]
