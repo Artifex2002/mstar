@@ -9,7 +9,7 @@ import torch
 
 from mstar.conductor.request_info import DEFAULT_PARTITION
 from mstar.graph.base import TensorPointerInfo
-from mstar.model.iris.config import IMAGE_SHAPE, OUTPUT_MODALITIES, ROLLOUT_LOOP, WORLD_KV
+from mstar.model.iris.config import IMAGE_SHAPE, OUTPUT_MODALITIES, ROLLOUT_LOOP, TOKEN_LOOP, WORLD_KV
 from mstar.model.iris.iris_model import IrisModel
 from mstar.model.multimodal import PromptPart
 from mstar.model.registry import get_model_class, model_init_kwargs
@@ -215,7 +215,7 @@ def test_horizon_is_action_count_and_never_silently_truncated(model):
     result = _prepare(model, actions=[0] * 20)
     assert any(result.metadata.get(key) is not None for key in model.LENGTH_KWARGS)
     assert model.get_max_output_tokens(**result.metadata) == 20
-    assert model.get_loop_caps(**result.metadata) == {ROLLOUT_LOOP: 20}
+    assert model.get_loop_caps(**result.metadata) == {ROLLOUT_LOOP: 20, TOKEN_LOOP: 18}
     assert _prepare(IrisModel(max_rollout_horizon=30), actions=[0] * 30).metadata["iris_horizon"] == 30
     with pytest.raises(ValueError, match="max_output_tokens"):
         _prepare(model, max_output_tokens=1)
@@ -287,12 +287,11 @@ def test_output_schema_errors_are_explicit(model, output, modality):
 
 def test_unimplemented_execution_is_explicit_and_dummy_mode_still_works(model):
     assert len(model.get_node_resources()) == 8
-    with pytest.raises(NotImplementedError, match="graph"):
-        model.get_graph_walk_graphs()
+    assert set(model.get_graph_walk_graphs()) == {"imagine"}
     with pytest.raises(NotImplementedError, match="submodules"):
         model.get_submodule("world_model")
     dummy = IrisModel(skip_weight_loading=True)
-    for node in ("image_encoder", "world_model", "image_decoder"):
+    for node in ("image_encoder", "world_model", "image_decoder", "initial_image_decoder"):
         assert dummy.get_submodule(node) is None
     with pytest.raises(ValueError, match="Unknown IRIS node"):
         dummy.get_submodule("typo")

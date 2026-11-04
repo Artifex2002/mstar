@@ -26,6 +26,7 @@ from mstar.model.iris.config import (
     IMAGE_DECODER,
     IMAGE_ENCODER,
     IMAGINE_WALK,
+    INITIAL_DECODER,
     OBSERVATION_SAMPLER,
     REWARD_SAMPLER,
     WORLD_ATTN,
@@ -74,7 +75,7 @@ def test_geometry_binding_and_resource_dependencies():
     for key, node in ((ENCODER_ATTN, IMAGE_ENCODER), (DECODER_ATTN, IMAGE_DECODER)):
         spec = specs[key]
         assert isinstance(spec, RaggedAttentionSpec)
-        assert spec.nodes == {node}
+        assert spec.nodes == ({node, INITIAL_DECODER} if node == IMAGE_DECODER else {node})
         assert spec.depends_on() == set()
         assert (spec.config.num_qo_heads, spec.config.num_kv_heads, spec.config.head_dim) == (1, 1, 64)
         assert spec.config.max_tokens_per_request == 256

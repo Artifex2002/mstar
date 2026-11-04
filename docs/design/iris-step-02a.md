@@ -1,6 +1,8 @@
 # IRIS, step 2a: declare engine resources
 
 Step 2 and the benchmark plan were committed and pushed as `8cae2069`.
+Step 2a was committed and pushed as `0bde3c29`, followed by the CPU-staging test
+correction `91966ae8`.
 This step adds declarations and CPU resource-lifecycle checks. Graph execution,
 neural computation, checkpoint loading and GPU qualification remain later work.
 
@@ -140,7 +142,7 @@ frame-end cache lengths `33, 50, ..., 339, 33`, new-label position IDs starting 
 zero, and the actual 25-page total. Transport is stubbed; resource lifecycle
 methods run unchanged.
 
-The graph and submodules are still unimplemented. CPU planning tests do not
+At the Step 2a checkpoint, the graph and submodules are still unimplemented. CPU planning tests do not
 establish GPU attention or sampling numerics. In particular, the FP32 reference
 requires qualification of the selected paged and ragged GPU attention kernels;
 declaring FP32 tensors is not evidence that a backend supports the full path.
@@ -188,3 +190,6 @@ Next is step 3: declare the graph and its token/frame loops, including new-conte
 prefill and routing from the latest generated image tokens. Keep neural
 computation and checkpoint loading at their explicit unimplemented boundary
 until step 4.
+The subsequent [Step 3 graph](iris-step-03.md) also declares a one-time initial
+decoder site sharing the decoder's attention resource, to retain the reference's
+initial reconstruction computation.

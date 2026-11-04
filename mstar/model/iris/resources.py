@@ -26,6 +26,7 @@ from mstar.model.iris.config import (
     IMAGE_DECODER,
     IMAGE_ENCODER,
     IMAGINE_WALK,
+    INITIAL_DECODER,
     OBSERVATION_SAMPLER,
     OBSERVATION_TOKENS,
     OBSERVATION_VOCAB_SIZE,
@@ -113,7 +114,7 @@ def iris_resources() -> list[NodeResourceSpec]:
         specs.append(
             RaggedAttentionSpec(
                 resource_key=key,
-                nodes={node},
+                nodes={node, INITIAL_DECODER} if node == IMAGE_DECODER else {node},
                 config=RaggedAttentionConfig(
                     num_qo_heads=1,
                     num_kv_heads=1,

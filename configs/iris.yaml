@@ -4,7 +4,7 @@ model_kwargs:
   game: "Breakout"
   max_rollout_horizon: 20
 node_groups:
-  - node_names: [image_encoder, world_model, image_decoder]
+  - node_names: [image_encoder, world_model, image_decoder, initial_image_decoder]
     ranks: [0]
 resources:
   world_kv:

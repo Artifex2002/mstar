@@ -569,7 +569,7 @@ categorical samplers; its tokenizer nodes declare cacheless spatial attention.
 Independent cache labels represent contexts re-primed from position zero.
 Completed labels remain allocated until request teardown, a documented memory
 tradeoff rather than a sliding-window replacement for the reference's refresh.
-The declarations are CPU-tested; the graph, submodules and GPU qualification
+The declarations and graph routing are CPU-tested; submodules and GPU qualification
 are still under development.
 
 ``get_node_resources`` returns a flat list of ``NodeResourceSpec`` objects. Every spec has
@@ -1333,6 +1333,13 @@ refuses the deployment.
 
 Step 3 — Declare the computation graph
 --------------------------------------
+
+The IRIS scaffold's ``mstar/model/iris/graph.py`` is a nested-loop example:
+one encoder feeds a frame loop containing a world-model call loop and image
+decoding. A separate initial decode preserves the reference's reconstruction
+work without emitting an extra predicted frame. See ``docs/design/iris-step-03.md``
+and ``test/modular/test_iris_graph.py`` for its routing contract and native-runtime
+checks; neural execution is not implemented yet.
 
 ``get_graph_walk_graphs`` returns one graph per walk. The primitives are defined in
 ``mstar/graph/base.py``:

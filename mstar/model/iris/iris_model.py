@@ -16,15 +16,19 @@ from mstar.model.iris.config import (
     IMAGE_ENCODER,
     IMAGE_SHAPE,
     IMAGINE_WALK,
+    INITIAL_DECODER,
     NUM_ACTIONS,
     OBSERVATION_SAMPLER,
     OUTPUT_MODALITIES,
     REWARD_SAMPLER,
     ROLLOUT_LOOP,
+    TOKEN_LOOP,
+    TOKENS_PER_FRAME,
     WORLD_KV,
     WORLD_MODEL,
     IrisConfig,
 )
+from mstar.model.iris.graph import imagination_graph
 from mstar.model.iris.resources import context_epochs, iris_resources, request_kv_layout
 from mstar.model.multimodal import PromptPart
 
@@ -182,7 +186,7 @@ class IrisModel(Model):
         return self._horizon(model_kwargs)
 
     def get_loop_caps(self, **model_kwargs) -> dict[str, int]:
-        return {ROLLOUT_LOOP: self._horizon(model_kwargs)}
+        return {ROLLOUT_LOOP: self._horizon(model_kwargs), TOKEN_LOOP: TOKENS_PER_FRAME + 1}
 
     def request_kwargs(self) -> frozenset[str]:
         return frozenset({"actions"})
@@ -245,7 +249,7 @@ class IrisModel(Model):
         return configs
 
     def get_graph_walk_graphs(self) -> dict[str, GraphSection]:
-        raise NotImplementedError("IRIS computation graph is not implemented yet")
+        return {IMAGINE_WALK: imagination_graph(self.config.max_rollout_horizon)}
 
     def get_submodule(
         self,
@@ -256,7 +260,7 @@ class IrisModel(Model):
         sp_group=None,
         moe_parallel=None,
     ) -> torch.nn.Module | None:
-        if node_name not in (IMAGE_ENCODER, WORLD_MODEL, IMAGE_DECODER):
+        if node_name not in (IMAGE_ENCODER, WORLD_MODEL, IMAGE_DECODER, INITIAL_DECODER):
             raise ValueError(f"Unknown IRIS node: {node_name!r}")
         if self.skip_weight_loading:
             return None

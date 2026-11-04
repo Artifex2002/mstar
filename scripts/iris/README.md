@@ -136,5 +136,23 @@ OMP_NUM_THREADS=2 .venv/bin/python -m pytest \
   test/modular/test_model_registration.py -q
 ```
 
-Full serving/graph-runtime validation later needs M*'s normal dependencies and
-Rust extension. This harness has not established M* inference or a speedup.
+## Native graph-routing tests
+
+The graph tests use synthetic CPU tensors and the real Rust runtime. They do not
+load IRIS weights. Install Rust/Cargo as described in `docs/installation.rst`, then
+build the extension into this checkout's environment:
+
+```bash
+uv pip install --python .venv/bin/python 'maturin>=1,<2'
+env -u CONDA_PREFIX VIRTUAL_ENV="$PWD/.venv" \
+  .venv/bin/maturin develop --release -m rust/Cargo.toml
+OMP_NUM_THREADS=2 .venv/bin/python -m pytest test/modular/test_iris_graph.py -q
+```
+
+The `env` command selects `.venv` explicitly if Conda base is active. Rebuild the
+extension when upstream Rust source changes. Without it, the native test cases
+skip; the structural tests still run. Local macOS modular fixtures stub optional
+accelerator imports; they do not emulate GPU computation.
+
+Full serving still needs M*'s normal dependencies. Neither the reference harness
+nor the graph-routing tests establish M* learned-model inference or a speedup.

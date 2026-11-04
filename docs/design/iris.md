@@ -1,13 +1,15 @@
 # IRIS: first contribution and learning plan
 
 Status: `codex/iris` is the implementation branch, based on `main`. The official
-reference harness is executable, and M* registration and the CPU request
-contract and resource declarations are implemented. M* inference is not implemented yet. The learner can
+reference harness is executable, and M* registration, the CPU request contract,
+resource declarations and computation graph are implemented. M* inference is not
+implemented yet. The learner can
 repeat the changes independently on an `iris` branch using the
 [Step 1 lesson](iris-step-01.md).
 Continue with the [Step 2 contract walkthrough](iris-step-02.md).
 Resource declarations and the context-storage tradeoff are explained in
 [Step 2a](iris-step-02a.md).
+The [Step 3 walkthrough](iris-step-03.md) explains nested loops and native routing tests.
 
 ## Benchmark objective
 
@@ -58,6 +60,8 @@ equivalent M* outputs; serving timing adds preprocessing, routing, transport and
 serialization and must be reported separately. The current diagnostic harness
 copies intermediates to CPU on every world-model call and is a correctness tool,
 not a raw-performance baseline. No timing claims may be derived from its trace runs.
+Both complete-rollout paths include the reference's one-time initial image
+reconstruction, even though it is discarded rather than returned as a prediction.
 
 After functional parity, add a timing harness under `benchmark/` and measure on
 the same GPU and software environment. Exclude model loading and compilation
