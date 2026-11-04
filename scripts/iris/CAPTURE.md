@@ -69,6 +69,13 @@ before loading the engine, while preserving explicitly selected indices.
 This fix requires no Rust rebuild. The pinned Gym package's maintenance notice
 is separate from that exception; the qualification environment pins NumPy 1.26.
 
+An older comparison also stopped at `INITIAL_DECODER` on request-key equality.
+That node deliberately emits no tensors: engine collection returns `{}`, while
+the direct driver retains empty entries per request. Update the branch for the
+initial-node representation adapter and rerun into a new output directory.
+Admission, replay auditing and all output-producing node comparisons remain
+strict. This diagnostic fix also needs no Rust rebuild.
+
 ## What a pass establishes
 
 1. On CUDA, `torch_static` matches fresh official traces at B=1/B=2 through

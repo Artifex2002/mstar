@@ -88,6 +88,16 @@ logical CUDA index and preserves explicit indices. CPU regressions exercise
 the exact PyTorch validation that rejected the original descriptor. The 37
 focused checks for this fix pass; CUDA capture/replay still needs its rerun.
 
+The subsequent attempt passed capture setup and encoder comparison, then
+stopped on the initial decoder's empty output mapping. The engine intentionally
+omits empty per-request entries during collection; the direct driver preserves
+them. `copy_step_outputs` adapts this representation only for the initial
+reconstruction, after admission/failure/replay checks. A CPU regression calls
+the actual `Engine._collect_outputs` for eager and captured addressing and
+reproduces the empty mapping. Unexpected initial output data and missing rows
+on output-producing nodes still fail. Complete CUDA rollout replay remains
+pending its rerun.
+
 ## What to learn
 
 Explain why a CUDA graph needs stable addresses and shapes while values can

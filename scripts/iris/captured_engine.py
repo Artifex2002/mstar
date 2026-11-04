@@ -17,12 +17,33 @@ from mstar.distributed.communication import WorkerParallelGroups
 from mstar.engine.engine import Engine, ExecutingBatch
 from mstar.engine.resources import StepContext, apply_yaml_overrides
 from mstar.engine.resources.kv.transfer import TransferEngineInfo
-from mstar.model.iris.config import IMAGINE_WALK
+from mstar.model.iris.config import IMAGINE_WALK, INITIAL_DECODER
 from mstar.model.submodule_base import InputMetadata
 from scripts.iris.local_engine import LocalIrisEngine
 from scripts.iris.qualify_cuda import indexed_cuda_device
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def copy_step_outputs(node, request_ids, output):
+    """Copy diagnostic outputs, restoring empty rows only for the no-output node.
+
+    Engine._merge_per_rid omits empty dictionaries. The direct resource driver
+    preserves them, so the initial reconstruction needs a representation adapter.
+    The caller must already have checked admission, failures and actual replay.
+    """
+    per_request = output.per_rid_outputs
+    expected = set(request_ids)
+    if node == INITIAL_DECODER:
+        if output.packed_outputs or output.row_outputs or set(per_request) - expected or any(per_request.values()):
+            raise AssertionError("initial reconstruction unexpectedly emitted output data or unknown requests")
+        return {rid: {} for rid in request_ids}
+    if set(per_request) != expected:
+        raise AssertionError(f"{node}: expected output requests {sorted(expected)}, got {sorted(per_request)}")
+    return {
+        rid: {name: [value.clone() for value in values] for name, values in tensors.items()}
+        for rid, tensors in per_request.items()
+    }
 
 
 class CapturedIrisEngine(LocalIrisEngine):
@@ -132,10 +153,7 @@ class CapturedIrisEngine(LocalIrisEngine):
             raise AssertionError(f"{node}: step did not execute exactly one engine-managed replay")
         self.engine.after_output_copy(batch)
         # Diagnostic ownership: a later replay may reuse its graph output buffers.
-        return {
-            rid: {name: [value.clone() for value in values] for name, values in tensors.items()}
-            for rid, tensors in output.per_rid_outputs.items()
-        }
+        return copy_step_outputs(node, inputs, output)
 
     def close(self, rid):
         self.engine.remove_request(rid)

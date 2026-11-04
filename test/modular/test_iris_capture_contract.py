@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -166,3 +167,76 @@ def test_real_engine_loads_capture_model_and_optin_resources_on_cpu(monkeypatch)
         assert all(module.node_resources for module in modules.values())
     finally:
         engine.shutdown()
+
+
+@pytest.fixture
+def capture_output_tools(monkeypatch):
+    import triton.language as tl
+
+    if not hasattr(tl, "int64"):
+        monkeypatch.setattr(tl, "int64", int, raising=False)
+    from mstar.engine.engine import Engine
+    from mstar.model.submodule_base import BatchedModelOutput, NodeInputs
+    from scripts.iris.captured_engine import copy_step_outputs
+
+    return Engine, BatchedModelOutput, NodeInputs, copy_step_outputs
+
+
+@pytest.mark.parametrize("captured", [False, True])
+def test_real_engine_empty_output_collection_matches_direct_initial_decode(capture_output_tools, captured):
+    Engine, Output, NodeInputs, copy_outputs = capture_output_tools
+    from mstar.engine.resources.step import BucketKey, SlotLease
+    from mstar.model.iris.config import INITIAL_DECODER
+
+    module = ImageSubmodule(Tokenizer(), decode=True, initial=True)
+    engine = Engine.__new__(Engine)
+    management = SimpleNamespace(
+        submodule=module,
+        accelerator_graph_runner=SimpleNamespace(slot_for=lambda lease: SimpleNamespace(dummy_rids=[-1, -2])),
+    )
+    lease = SlotLease(0, BucketKey(IMAGINE_WALK, 2, 0)) if captured else None
+    raw = Output(per_rid_outputs={rid: {} for rid in ([-1, -2] if captured else [1, 2])})
+    collected = engine._collect_outputs(
+        management,
+        lease,
+        raw,
+        [NodeInputs(), NodeInputs()],
+        {},
+        [1, 2],
+        (1, 2),
+        IMAGINE_WALK,
+    )
+    assert collected.per_rid_outputs == {}  # engine intentionally drops empty entries
+    direct = {1: {}, 2: {}}
+    assert copy_outputs(INITIAL_DECODER, [1, 2], collected) == direct
+
+
+@pytest.mark.parametrize("bad_kind", ["unknown_request", "per_request_tensor", "packed_tensor", "row_tensor"])
+def test_initial_decode_adapter_refuses_unexpected_data(capture_output_tools, bad_kind):
+    _, Output, _, copy_outputs = capture_output_tools
+    from mstar.model.iris.config import INITIAL_DECODER
+
+    output = Output()
+    if bad_kind == "unknown_request":
+        output.per_rid_outputs = {99: {}}
+    elif bad_kind == "per_request_tensor":
+        output.per_rid_outputs = {1: {"frames": [torch.zeros(1)]}}
+    elif bad_kind == "packed_tensor":
+        output.packed_outputs = {"__frames__": torch.zeros(1)}
+    else:
+        output.row_outputs = {"frames": torch.zeros(1)}
+    with pytest.raises(AssertionError, match="unexpectedly emitted"):
+        copy_outputs(INITIAL_DECODER, [1, 2], output)
+
+
+def test_output_producing_nodes_still_require_every_row_and_copy_tensors(capture_output_tools):
+    _, Output, _, copy_outputs = capture_output_tools
+    from mstar.model.iris.config import WORLD_MODEL
+
+    with pytest.raises(AssertionError, match="expected output requests"):
+        copy_outputs(WORLD_MODEL, [1, 2], Output(per_rid_outputs={1: {}}))
+    values = torch.arange(16)
+    copied = copy_outputs(WORLD_MODEL, [1], Output(per_rid_outputs={1: {"observation_tokens": [values]}}))
+    assert torch.equal(copied[1]["observation_tokens"][0], values)
+    values.zero_()
+    assert copied[1]["observation_tokens"][0].tolist() == list(range(16))
