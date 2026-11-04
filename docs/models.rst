@@ -17,10 +17,11 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
    * - ``bagel``
      - ``ByteDance-Seed/BAGEL-7B-MoT``
      - Unified multimodal model (text + image understanding and generation).
-   * - ``iris`` *(Development scaffold)*
+   * - ``iris`` *(Development)*
      - ``eloialonso/iris`` (``pretrained_models/Breakout.pt``)
      - IRIS Transformer world-model integration: Breakout supplied-action request
-       contract, resources and graph implemented; GPU inference is not implemented yet.
+       contract, resources, graph and eager FP32 submodules implemented. Official
+       checkpoint parity checked on CPU; GPU serving and performance remain unvalidated.
    * - ``chatterbox`` / ``chatterbox_multilingual`` / ``chatterbox_turbo``
      - ``ResembleAI/chatterbox``, ``ResembleAI/chatterbox-turbo``
      - Zero-shot voice-cloning TTS: T3 speech-token LM (Llama-520M, or GPT-2-medium

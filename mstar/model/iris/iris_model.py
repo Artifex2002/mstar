@@ -34,7 +34,7 @@ from mstar.model.multimodal import PromptPart
 
 
 class IrisModel(Model):
-    """Bounded supplied-action imagination; GPU execution is not implemented yet."""
+    """Bounded supplied-action imagination using the pinned Breakout networks."""
 
     PREPROCESS_ONLY_KWARGS = ("actions",)
     INTERNAL_KWARGS = ("iris_horizon",)
@@ -48,11 +48,15 @@ class IrisModel(Model):
         game: str = "Breakout",
         max_rollout_horizon: int = 20,
         skip_weight_loading: bool = False,
+        checkpoint_path: str | None = None,
     ):
         self.config = IrisConfig(game=game, max_rollout_horizon=max_rollout_horizon)
         self.model_path_hf = model_path_hf
         self.cache_dir = cache_dir
         self.skip_weight_loading = skip_weight_loading
+        self._checkpoint_path = checkpoint_path
+        self._networks = {}
+        self._submodules = {}
 
     @staticmethod
     def _validate_modalities(input_modalities, output_modalities):
@@ -264,4 +268,23 @@ class IrisModel(Model):
             raise ValueError(f"Unknown IRIS node: {node_name!r}")
         if self.skip_weight_loading:
             return None
-        raise NotImplementedError("IRIS submodules and weight loading are not implemented yet")
+        from mstar.model.iris.checkpoint import load_networks, resolve_checkpoint
+        from mstar.model.iris.submodules import ImageSubmodule, WorldSubmodule
+
+        if autocast_dtype not in (None, torch.float32):
+            raise ValueError("IRIS's reference path requires FP32")
+        device = str(torch.device(device))
+        key = (node_name, device)
+        if key not in self._submodules:
+            if device not in self._networks:
+                path = resolve_checkpoint(self._checkpoint_path, self.model_path_hf, self.cache_dir)
+                self._networks[device] = load_networks(path, device)
+            networks = self._networks[device]
+            if node_name == WORLD_MODEL:
+                module = WorldSubmodule(networks.world, self.config.max_rollout_horizon)
+            else:
+                module = ImageSubmodule(
+                    networks.tokenizer, decode=node_name != IMAGE_ENCODER, initial=node_name == INITIAL_DECODER
+                )
+            self._submodules[key] = module.eval()
+        return self._submodules[key]

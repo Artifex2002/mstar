@@ -569,8 +569,9 @@ categorical samplers; its tokenizer nodes declare cacheless spatial attention.
 Independent cache labels represent contexts re-primed from position zero.
 Completed labels remain allocated until request teardown, a documented memory
 tradeoff rather than a sliding-window replacement for the reference's refresh.
-The declarations and graph routing are CPU-tested; submodules and GPU qualification
-are still under development.
+The declarations, native graph routing and eager neural submodules are CPU-tested,
+including official-checkpoint numerical comparisons. GPU serving qualification
+is still pending; see ``docs/design/iris-step-04.md``.
 
 ``get_node_resources`` returns a flat list of ``NodeResourceSpec`` objects. Every spec has
 these common members:
@@ -647,7 +648,8 @@ The spec types are:
      - Self-attention planned over the named cache. ``backend`` selects
        ``AttnBackend.AUTO`` (the default, which lets the engine pick the platform's
        paged backend, FlashInfer for now), ``AttnBackend.FLASHINFER``,
-       ``AttnBackend.DENSE``, ``AttnBackend.FLEX`` or ``AttnBackend.FLASHINFER_MLA``.
+       ``AttnBackend.DENSE``, ``AttnBackend.FLEX``, ``AttnBackend.FLASHINFER_MLA``
+       or ``AttnBackend.TORCH``.
        Leave it at ``AUTO`` unless the model needs a specific kernel. FlashInfer, dense
        and MLA attention require a ``PagedKVConfig``; FlexAttention requires a
        ``RingKVConfig``. ``DENSE`` runs one varlen pass over each stream's frozen
@@ -658,6 +660,12 @@ The spec types are:
        that kernel when it builds the resource, so a backend the GPU or FlashInfer build
        cannot run stops the server with a ``ValueError`` naming it. Its wrappers share one
        workspace, taken at build.
+       ``TORCH`` is an opt-in eager reference backend, preserving the input dtype
+       (including FP32) over an NHD paged KV cache. It gathers each request's
+       context and materializes attention scores, with a bottom-right causal
+       mask for cached queries. It supports neither capture nor pre-plan, sliding
+       windows, nor custom ``sm_scale``. It is for numerical qualification, with
+       no performance claim; ``AUTO`` keeps its existing selection.
        ``flashinfer_backend`` selects a kernel generation: ``"auto"``, ``"fa2"`` or
        ``"fa3"`` when the FlashInfer backend is selected. ``decode_tensor_cores``
        (default ``True``) runs one-token decode rows on FlashInfer's tensor-core
@@ -729,7 +737,8 @@ The spec types are:
        ``RaggedAttentionConfig`` holds ``num_qo_heads``, ``num_kv_heads`` and
        ``head_dim`` (all pre-sharding, as in ``KVConfig``), an ``sm_scale`` that
        defaults to ``head_dim ** -0.5``, ``backend`` (``RaggedAttnBackend.AUTO``, the
-       default, ``RaggedAttnBackend.FLASHINFER``, or ``RaggedAttnBackend.DENSE``),
+       default, ``RaggedAttnBackend.FLASHINFER``, ``RaggedAttnBackend.DENSE``, or
+       ``RaggedAttnBackend.TORCH``),
        ``flashinfer_backend``, the
        two CUDA-graph ceilings ``max_segments_per_request`` (``max_segments_per_step``
        for a ``one_row_per_step`` region) and
@@ -747,6 +756,11 @@ The spec types are:
        ``shard_over_sp`` and ``workspace_mb`` are the model's declaration; the serving
        config's ``resources:`` overrides take only the backends and the ceilings. See
        `Cacheless attention (encoder towers)`_ for ``compile_op``.
+       ``TORCH`` provides eager self-attention within each declared segment,
+       preserving FP32 inputs. It supports an explicit ``sm_scale`` but no
+       capture, pre-plan or LSE return. It is a correctness reference, not an
+       optimized serving backend, and is not implemented for ragged cross-
+       or block-causal attention.
    * - ``RaggedCrossAttentionSpec(config=RaggedAttentionConfig(...))``
      - The cross-attention counterpart: one span of each request attends another
        (``RaggedCrossAttentionStep(pairs=...)``). Same config. See `Cross-attention

@@ -154,5 +154,43 @@ extension when upstream Rust source changes. Without it, the native test cases
 skip; the structural tests still run. Local macOS modular fixtures stub optional
 accelerator imports; they do not emulate GPU computation.
 
-Full serving still needs M*'s normal dependencies. Neither the reference harness
-nor the graph-routing tests establish M* learned-model inference or a speedup.
+Full serving still needs M*'s normal dependencies. The graph-routing tests use
+synthetic outputs; learned-model parity is checked separately below. Neither is
+a performance benchmark.
+
+## Eager M* inference qualification
+
+The checkpoint loader and neural submodules now execute through real engine
+resources. For the optional parity tests, keep the verified checkpoint at
+`.ci-results/iris/Breakout.pt` and generate the 20-frame, two-row official trace:
+
+```bash
+OMP_NUM_THREADS=2 .venv/bin/python scripts/iris/reference_harness.py \
+  --reference-root .ci-results/iris/reference \
+  --checkpoint .ci-results/iris/Breakout.pt \
+  --output .ci-results/iris/context-refresh --horizon 20 --batch-size 2
+OMP_NUM_THREADS=2 .venv/bin/python -m pytest \
+  test/modular/test_iris_execution.py \
+  test/modular/test_torch_reference_attention.py -q -s
+```
+
+The trace generator requires a new output directory; reuse an existing verified
+trace instead of rerunning that command over it. The parity cases skip when
+their checkpoint, trace or reference checkout is absent. They compare two
+trajectories with the reference's sampled values supplied to the M* samplers;
+CPU tests do not execute M*'s CUDA/XPU sampling kernel.
+
+On a CUDA host with M* installed and the checkpoint cached, qualify actual
+sampling with:
+
+```bash
+OMP_NUM_THREADS=2 python -m pytest test/modular/test_iris_execution.py \
+  -k cuda_eager_rollout -q -s
+```
+
+This must report a pass, not a skip. It executes a 20-frame rollout through the
+real eager submodules/resources, including context refresh. It does not launch
+the API server or establish numerical GPU parity against official IRIS. Those
+checks remain required before benchmarking. `configs/iris.yaml` opts into the
+eager `torch` attention backends; compilation, capture and batching are deferred.
+See [the Step 4 lesson](../../docs/design/iris-step-04.md).

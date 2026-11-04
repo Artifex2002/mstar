@@ -1,4 +1,4 @@
-# Development scaffold: real inference is not implemented yet.
+# Eager FP32 correctness configuration; GPU serving validation is still required.
 model: "iris"
 model_kwargs:
   game: "Breakout"
@@ -11,3 +11,9 @@ resources:
     page_size: 16
     max_num_pages: 64
     prefix_cache: false
+  world_attn:
+    backend: torch
+  encoder_attn:
+    backend: torch
+  decoder_attn:
+    backend: torch

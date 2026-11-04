@@ -285,11 +285,9 @@ def test_output_schema_errors_are_explicit(model, output, modality):
         model.postprocess(output, modality)
 
 
-def test_unimplemented_execution_is_explicit_and_dummy_mode_still_works(model):
+def test_dummy_mode_remains_weight_free(model):
     assert len(model.get_node_resources()) == 8
     assert set(model.get_graph_walk_graphs()) == {"imagine"}
-    with pytest.raises(NotImplementedError, match="submodules"):
-        model.get_submodule("world_model")
     dummy = IrisModel(skip_weight_loading=True)
     for node in ("image_encoder", "world_model", "image_decoder", "initial_image_decoder"):
         assert dummy.get_submodule(node) is None

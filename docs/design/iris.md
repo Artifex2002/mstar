@@ -2,14 +2,17 @@
 
 Status: `codex/iris` is the implementation branch, based on `main`. The official
 reference harness is executable, and M* registration, the CPU request contract,
-resource declarations and computation graph are implemented. M* inference is not
-implemented yet. The learner can
+resource declarations, computation graph and eager FP32 neural submodules are
+implemented. CPU numerical checks pass against the official checkpoint; CUDA
+sampling, full server execution and performance are not yet qualified. The learner can
 repeat the changes independently on an `iris` branch using the
 [Step 1 lesson](iris-step-01.md).
 Continue with the [Step 2 contract walkthrough](iris-step-02.md).
 Resource declarations and the context-storage tradeoff are explained in
 [Step 2a](iris-step-02a.md).
 The [Step 3 walkthrough](iris-step-03.md) explains nested loops and native routing tests.
+The [Step 4 walkthrough](iris-step-04.md) covers checkpoint loading, neural
+computation, resource-step declarations and the remaining GPU acceptance checks.
 
 ## Benchmark objective
 
