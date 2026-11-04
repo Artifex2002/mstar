@@ -2,10 +2,11 @@
 
 The earlier [T4 qualification](iris-t4-qualification.json) passed the eager
 neural/resource checks at `caf2f45a`. Its driver called real resource lifecycle
-methods directly. The next acceptance gate is a run through M*'s normal server,
-conductor, graph runtime and worker; those layers were outside that driver.
-This continuation remains part of eager integration validation. CUDA graph
-capture and performance measurement follow once this gate passes.
+methods directly. This continuation validates M*'s normal server, conductor,
+graph runtime and worker; those layers were outside that driver.
+The [full-server T4 run](iris-t4-server-qualification.json) passed at clean commit
+`ac98d64a`. This remains eager integration validation; CUDA graph capture and
+performance measurement follow.
 
 ## Read the implementation in this order
 
@@ -44,8 +45,8 @@ H=20 baseline, then failed on HTTP warmup: IRIS indexed an absent `rollout_loop`
 counter. The standalone metadata regression reproduced that `KeyError` without
 a GPU. IRIS now reads sparse counters with a zero default in preparation and
 stopping, matching the worker's initial/snapshot contract. No worker scheduling
-or resource lifecycle change is needed for this fix. Full-server CUDA rerun is
-still required.
+or resource lifecycle change was needed. The next run, at `ac98d64a`, passed
+the complete eager full-server gate described below.
 
 ## Trace the M* path
 
@@ -90,7 +91,33 @@ commands and review the complete report plus server log. A failure is evidence
 to investigate at the named stage, not a reason to add speculative fixes to
 several layers. Preserve the commit and environment in every rerun.
 
-Once the full-server report passes, proceed to capture-compatible attention and
+The user-provided `iris-server-check-03.zip` records a passed run on Tesla T4,
+PyTorch 2.12.1+cu132, CUDA build 13.2, FlashInfer 0.7.2 and Rust extension 0.1.1.
+The [qualification record](iris-t4-server-qualification.json) retains case
+results, cleanup snapshots, artifact hashes and limits. Local inspection
+independently verified the saved HTTP arrays against the local eager baseline
+and checked all eight raw Prometheus snapshots against the report.
+
+| Check | Observed result |
+| --- | --- |
+| H=20 HTTP versus local eager driver | Frames, rewards and endings bit-exact, including context refresh |
+| Same client ID and seed after completion | Second H=20 rollout also bit-exact |
+| H=20/H=20 and H=20/H=2 | Both pairs reached two API requests in flight and returned their exact output counts |
+| Invalid Breakout action 4 | HTTP 400 with an action validation message |
+| Disconnect after first frame | Abort counter incremented, resources drained, later same-ID request succeeded |
+| Cleanup after every case | API/conductor/pending steps/world KV idle with fresh status; final counters: eight successes, one abort |
+
+The local baseline here is M*'s resource driver. The earlier
+[official-versus-M* numerical run](iris-t4-qualification.json) supplies the
+separate reference comparison. Multirow scheduling appears in the metrics,
+but those histograms alone do not establish that every world-model step ran
+one batched forward. The log's invalid-action traceback is the intentional
+negative case. At final process-group teardown it also contains a
+`KeyboardInterrupt` while the conductor joins a child after SIGINT; this
+qualification does not claim graceful process shutdown. No performance result
+comes from this run.
+
+Proceed to capture-compatible attention and
 engine-managed CUDA graphs. Those changes need their own numerical, lifecycle
 and capture/replay checks. Afterward add a non-diagnostic benchmark under
 `benchmark/`, read the repository's benchmarking skill, and measure official

@@ -7,9 +7,10 @@ attention and real FlashInfer sampling. It does not measure performance or
 qualify CUDA graph capture.
 
 Use Linux with an NVIDIA GPU. The [Colab notebook](qualify_server_colab.ipynb)
-contains these commands. A T4 is suitable for the existing eager configuration;
-the full-server run has not yet been qualified on it. Keep the previous CUDA
-report so both runs' commits and environment versions can be compared.
+contains these commands. The eager full-server run passed on Tesla T4 at clean
+commit `ac98d64a`; see the [qualification record](../../docs/design/iris-t4-server-qualification.json).
+Keep the previous CUDA report so both runs' commits and environment versions
+can be compared. Rerun this gate when changing execution behavior.
 
 ## Prepare a fresh or existing Colab runtime
 

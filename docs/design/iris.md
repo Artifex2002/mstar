@@ -5,8 +5,10 @@ reference harness is executable, and M* registration, the CPU request contract,
 resource declarations, computation graph and batched eager FP32 neural submodules are
 implemented. CPU checks and eager CUDA numerical/sampling qualification pass;
 the user-provided [Tesla T4 report](iris-t4-qualification.json) records clean
-commit `caf2f45a`, PyTorch 2.12.1+cu132 and FlashInfer 0.7.2. Full server
-execution, CUDA graphs and performance are not yet qualified. The learner can
+commit `caf2f45a`, PyTorch 2.12.1+cu132 and FlashInfer 0.7.2. The subsequent
+[full-server T4 run](iris-t4-server-qualification.json) passed on clean commit
+`ac98d64a`, including seeded HTTP parity, concurrency, cancellation and cleanup.
+CUDA graphs and performance are not yet qualified. The learner can
 repeat the changes independently on an `iris` branch using the
 [Step 1 lesson](iris-step-01.md).
 Continue with the [Step 2 contract walkthrough](iris-step-02.md).
@@ -18,7 +20,8 @@ computation, resource-step declarations and the remaining GPU acceptance checks.
 The [Step 5a walkthrough](iris-step-05.md) adds eager batching and an executable
 [CUDA qualification guide](../../scripts/iris/CUDA.md) for Colab or the cluster.
 The [server continuation](iris-step-05-server.md) adds a real HTTP/native-worker
-qualification harness; its GPU run is the next acceptance gate.
+qualification harness and records its successful GPU run. Capture-compatible
+attention and engine-managed CUDA graphs are the next implementation gate.
 
 ## Benchmark objective
 

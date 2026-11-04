@@ -1,0 +1,431 @@
+{
+  "status": "passed",
+  "stage": "complete",
+  "started_utc": "2026-11-04T21:54:26.554471+00:00",
+  "mstar_commit": "ac98d64ab327199f64046f9300aaa886d34d8ad2",
+  "working_tree_status": "",
+  "purpose": "full-server eager FP32 correctness; no performance measurement",
+  "capture": "disabled",
+  "hardware": {
+    "gpu": "Tesla T4",
+    "torch": "2.12.1+cu132",
+    "cuda_build": "13.2",
+    "rust_extension": "0.1.1",
+    "flashinfer": "0.7.2"
+  },
+  "checkpoint_sha256": "169e3669b7d1901990b4ebce35ff8f3355610fae393e6a587fd62c40faf790f4",
+  "provenance": {
+    "source": "user-provided Colab artifact, independently inspected locally",
+    "archive": "iris-server-check-03.zip",
+    "archive_sha256": "2cf5e2105d2190b8a02c3f3a5a0bcf636a8bbf1be49e68150a1eef905477c1de",
+    "report_sha256": "4f8c8dc7e4943d3db9be4cfe2a971cebda664e00f9f61549bad6932e32958920",
+    "server_log_sha256": "e8002163e006c0c38e6c87162129192eb92eaae697c9ce0cbb0b1d39a76f1e5f"
+  },
+  "server_versions": {
+    "mstar-ai": "0.2.1",
+    "torch": "2.12.1+cu132",
+    "transformers": null
+  },
+  "cases": {
+    "warmup": {
+      "counts": {
+        "video_frame": 1,
+        "scalar": 1,
+        "tensor": 1
+      },
+      "client_disconnected": false
+    },
+    "native_vs_local": {
+      "counts": {
+        "video_frame": 20,
+        "scalar": 20,
+        "tensor": 20
+      },
+      "client_disconnected": false,
+      "local_comparison": {
+        "max_rgb24_error": 0,
+        "rewards_endings": "exact"
+      }
+    },
+    "reused_request_id": {
+      "counts": {
+        "video_frame": 20,
+        "scalar": 20,
+        "tensor": 20
+      },
+      "client_disconnected": false,
+      "local_comparison": {
+        "max_rgb24_error": 0,
+        "rewards_endings": "exact"
+      }
+    },
+    "concurrent": {
+      "peak_api_in_flight": 2.0,
+      "requests": {
+        "iris-concurrent-0": {
+          "counts": {
+            "video_frame": 20,
+            "scalar": 20,
+            "tensor": 20
+          }
+        },
+        "iris-concurrent-1": {
+          "counts": {
+            "video_frame": 20,
+            "scalar": 20,
+            "tensor": 20
+          }
+        }
+      }
+    },
+    "request_departure": {
+      "peak_api_in_flight": 2.0,
+      "requests": {
+        "iris-request_departure-0": {
+          "counts": {
+            "video_frame": 20,
+            "scalar": 20,
+            "tensor": 20
+          }
+        },
+        "iris-request_departure-1": {
+          "counts": {
+            "video_frame": 2,
+            "scalar": 2,
+            "tensor": 2
+          }
+        }
+      }
+    },
+    "invalid_action": {
+      "status": 400,
+      "message": "{\"detail\":\"preprocessing failed: ValueError: IRIS action IDs must be integers in [0, 4); bool is not an action ID\"}"
+    },
+    "client_disconnect": {
+      "counts": {
+        "video_frame": 1,
+        "scalar": 0,
+        "tensor": 0
+      },
+      "client_disconnected": true
+    },
+    "after_disconnect": {
+      "counts": {
+        "video_frame": 1,
+        "scalar": 1,
+        "tensor": 1
+      },
+      "client_disconnected": false
+    }
+  },
+  "cleanup": {
+    "warmup": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.34441289100004724
+      ],
+      "success": 1.0,
+      "aborts": 0.0,
+      "steps_with_more_than_one_row": 0.0
+    },
+    "native_vs_local": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.08280633000003945
+      ],
+      "success": 2.0,
+      "aborts": 0.0,
+      "steps_with_more_than_one_row": 0.0
+    },
+    "reused_request_id": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.3256591849999495
+      ],
+      "success": 3.0,
+      "aborts": 0.0,
+      "steps_with_more_than_one_row": 0.0
+    },
+    "concurrent": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.07152826499986986
+      ],
+      "success": 5.0,
+      "aborts": 0.0,
+      "steps_with_more_than_one_row": 301.0
+    },
+    "request_departure": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.22957371999973475
+      ],
+      "success": 7.0,
+      "aborts": 0.0,
+      "steps_with_more_than_one_row": 331.0
+    },
+    "invalid_action": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.3145804420000786
+      ],
+      "success": 7.0,
+      "aborts": 0.0,
+      "steps_with_more_than_one_row": 331.0
+    },
+    "client_disconnect": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.7393117960000382
+      ],
+      "success": 7.0,
+      "aborts": 1.0,
+      "steps_with_more_than_one_row": 331.0
+    },
+    "after_disconnect": {
+      "complete": true,
+      "idle": true,
+      "api_in_flight": [
+        0.0
+      ],
+      "conductor": {
+        "waiting": [
+          0.0
+        ],
+        "running": [
+          0.0
+        ],
+        "draining": [
+          0.0
+        ]
+      },
+      "kv_pages_used": [
+        0.0
+      ],
+      "kv_pages_cached": [
+        0.0
+      ],
+      "status_age_seconds": [
+        0.3997995869999613
+      ],
+      "success": 8.0,
+      "aborts": 1.0,
+      "steps_with_more_than_one_row": 331.0
+    }
+  },
+  "array_verification": {
+    "native_vs_local": {
+      "file_sha256": "e9b83b287e001752c7360d987ab634cfe9d659fc5c4a0b5714c16c915be90e12",
+      "frames_shape": [
+        20,
+        64,
+        64,
+        3
+      ],
+      "frames_dtype": "uint8",
+      "frames_rewards_endings": "bit-exact with local-baseline.npz; hashes match the HTTP report"
+    },
+    "reused_request_id": {
+      "file_sha256": "e9b83b287e001752c7360d987ab634cfe9d659fc5c4a0b5714c16c915be90e12",
+      "frames_shape": [
+        20,
+        64,
+        64,
+        3
+      ],
+      "frames_dtype": "uint8",
+      "frames_rewards_endings": "bit-exact with local-baseline.npz; hashes match the HTTP report"
+    }
+  },
+  "metrics_verification": {
+    "concurrent.prom": {
+      "sha256": "13123f5c9ceea51a49be42fd125aef9cc355c6ea33c0b7dfba85aabe1d9d7489",
+      "matches_report_cleanup": true
+    },
+    "request_departure.prom": {
+      "sha256": "2f8f6ea4353ca8ab50ed0ac52f69240a8f7f08cb045ee7d23d473f7343acf0f0",
+      "matches_report_cleanup": true
+    },
+    "client_disconnect.prom": {
+      "sha256": "13d0f55b8eeb00a3bf11256b7d2ed5fd2c611561fcdfb84872d06eafb1ba7465",
+      "matches_report_cleanup": true
+    },
+    "after_disconnect.prom": {
+      "sha256": "8e37f320f608833258874530229cffce76584517cc1889b83361856fb3138f4b",
+      "matches_report_cleanup": true
+    },
+    "warmup.prom": {
+      "sha256": "b959d1c871ab3b62189f0c9e70d1f4f1f53e97e6c2c7df8cdc2b1641a4658e50",
+      "matches_report_cleanup": true
+    },
+    "native_vs_local.prom": {
+      "sha256": "cd9ba9efa904375c9fc67abab4de6e6355032bad349f0d4e4edaaa47204fd195",
+      "matches_report_cleanup": true
+    },
+    "invalid_action.prom": {
+      "sha256": "38d46157d6cb2f69c297d3cfb9eea88bdcc2e1ce75fdc95e096e8b4b3c135ec4",
+      "matches_report_cleanup": true
+    },
+    "reused_request_id.prom": {
+      "sha256": "fc815fb75ded88a13d86c68ff8b4840df25ce2e81f7d294ded14c60b7a36fe14",
+      "matches_report_cleanup": true
+    }
+  },
+  "shutdown": {
+    "managed_server_report": "completed",
+    "log_note": "SIGINT process-group teardown produced KeyboardInterrupt while the conductor joined a child. This result does not establish graceful process shutdown."
+  },
+  "limits": [
+    "This compares HTTP serving with the M* local eager driver; official-versus-M* numerical evidence is recorded separately in iris-t4-qualification.json.",
+    "Concurrent requests and multirow scheduling were observed; the batch-size histogram alone does not establish every world-model call ran a batched forward.",
+    "CUDA graphs and torch.compile were disabled; no performance measurements or speedup claims.",
+    "Validation covers the recorded cases on this GPU and commit, not all inputs or deployments."
+  ]
+}

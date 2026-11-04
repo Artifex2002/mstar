@@ -572,8 +572,9 @@ tradeoff rather than a sliding-window replacement for the reference's refresh.
 The declarations, native graph routing and eager neural submodules are CPU-tested,
 including official-checkpoint numerical comparisons. Eager CUDA numerical and
 sampling checks also passed on Tesla T4; see ``docs/design/iris-step-05.md``.
-Full-server qualification is pending, with a runnable harness described in
-``scripts/iris/SERVER.md``.
+Eager full-server qualification passed on T4 at ``ac98d64a``; the evidence is
+in ``docs/design/iris-t4-server-qualification.json``, with the runnable harness
+described in ``scripts/iris/SERVER.md``. Capture and performance remain pending.
 
 ``get_node_resources`` returns a flat list of ``NodeResourceSpec`` objects. Every spec has
 these common members:

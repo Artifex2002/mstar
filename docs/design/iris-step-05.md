@@ -126,5 +126,8 @@ independent rerun on this local machine.
 Both B=1 and B=2 passed all 342 world calls through context refresh. Encoder
 codes matched exactly; maximum observation-logit error was `1.5258789e-05`, and
 maximum predicted-RGB error was `1.1146069e-05`. Actual sampling passed both
-batch cases, request departure and handle reuse. Full server/native-worker
-execution and performance remain separate acceptance gates. CUDA graphs stayed off.
+batch cases, request departure and handle reuse. CUDA graphs stayed off.
+The separate full-server/native-worker gate subsequently passed at `ac98d64a`;
+see the [server continuation](iris-step-05-server.md) and
+[server qualification record](iris-t4-server-qualification.json). Capture and
+performance remain separate acceptance gates.

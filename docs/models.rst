@@ -21,8 +21,10 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
      - ``eloialonso/iris`` (``pretrained_models/Breakout.pt``)
      - IRIS Transformer world-model integration: Breakout supplied-action request
        contract, resources, graph and batched eager FP32 submodules implemented. Official
-       checkpoint parity checked on CPU and Tesla T4 (B=1/2). Full-server
-       execution, CUDA graphs and performance remain unvalidated.
+       checkpoint parity checked on CPU and Tesla T4 (B=1/2). Eager full-server
+       correctness also passed on T4 at ``ac98d64a``; see
+       ``docs/design/iris-t4-server-qualification.json``. CUDA graphs and
+       performance remain unvalidated.
    * - ``chatterbox`` / ``chatterbox_multilingual`` / ``chatterbox_turbo``
      - ``ResembleAI/chatterbox``, ``ResembleAI/chatterbox-turbo``
      - Zero-shot voice-cloning TTS: T3 speech-token LM (Llama-520M, or GPT-2-medium
