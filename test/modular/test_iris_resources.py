@@ -154,6 +154,8 @@ def test_real_cache_and_position_plans_start_new_epoch_at_zero(monkeypatch):
     from mstar.engine.resources.position.manager import RopeManager
 
     monkeypatch.setattr(manager_mod, "KVTransferManager", _NoTransfer)
+    # Exercise pageable CPU staging even on hosts with an available accelerator.
+    monkeypatch.setattr(torch.accelerator, "is_available", lambda: False)
     model, specs = _specs()
     kv = KVManager(
         cfg=specs[WORLD_KV].config,
