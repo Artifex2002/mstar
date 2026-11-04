@@ -101,8 +101,11 @@ class WorldSubmodule(IrisSubmodule):
         self.schedules = tuple(frame_calls(frame) for frame in range(max_horizon))
 
     def prepare_inputs(self, graph_walk, fwd_info, inputs, **kwargs):
-        frame = fwd_info.dynamic_loop_iter_counts[ROLLOUT_LOOP]
-        token = fwd_info.dynamic_loop_iter_counts[TOKEN_LOOP]
+        # A new request's loop snapshot is sparse: absent counters mean zero.
+        # Keep reading the per-step snapshot, which speculation can advance
+        # independently of the shared request's counters.
+        frame = fwd_info.dynamic_loop_iter_counts.get(ROLLOUT_LOOP, 0)
+        token = fwd_info.dynamic_loop_iter_counts.get(TOKEN_LOOP, 0)
         if frame >= fwd_info.step_metadata["iris_horizon"] or token >= len(self.schedules[frame]):
             return None
         call = self.schedules[frame][token]
@@ -176,6 +179,6 @@ class WorldSubmodule(IrisSubmodule):
         }
 
     def check_stop(self, request_id, request_info, outputs):
-        frame = request_info.dynamic_loop_iter_counts[ROLLOUT_LOOP]
-        token = request_info.dynamic_loop_iter_counts[TOKEN_LOOP]
+        frame = request_info.dynamic_loop_iter_counts.get(ROLLOUT_LOOP, 0)
+        token = request_info.dynamic_loop_iter_counts.get(TOKEN_LOOP, 0)
         return {TOKEN_LOOP} if token + 1 == len(self.schedules[frame]) else set()

@@ -27,10 +27,25 @@ capture and performance measurement follow once this gate passes.
    when the checkpoint is cached. These CPU tests do not run a GPU server.
    The deployment regression also validates the generated serving YAML without
    weights; it reproduces the missing-`max_seq_len` startup failure before the fix.
+5. `test/modular/test_iris_serving_metadata.py` is a standalone CPU regression
+   for the first world-model step. It uses the real request-state manager,
+   normal/columnar worker snapshot helpers and engine wrapper before calling
+   IRIS's real `prepare_inputs` and `check_stop`. A new request can have an empty
+   snapshot: missing loop counters mean iteration zero. The snapshot remains
+   authoritative when shared counters advance. Cases cover first entry, token
+   and frame advancement, context refresh, stopping and speculative overshoot.
 
 No worker, engine, graph-runtime or model behavior is changed by this harness.
 The `iris` installation extra supplies runtime dependencies; `metrics` is an
 existing extra. Rebuild `rust/` from the tested checkout before serving.
+
+The second Colab server run (`e5ba135b`, Tesla T4) passed startup and the local
+H=20 baseline, then failed on HTTP warmup: IRIS indexed an absent `rollout_loop`
+counter. The standalone metadata regression reproduced that `KeyError` without
+a GPU. IRIS now reads sparse counters with a zero default in preparation and
+stopping, matching the worker's initial/snapshot contract. No worker scheduling
+or resource lifecycle change is needed for this fix. Full-server CUDA rerun is
+still required.
 
 ## Trace the M* path
 
