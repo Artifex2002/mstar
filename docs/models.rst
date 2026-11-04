@@ -19,7 +19,8 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
      - Unified multimodal model (text + image understanding and generation).
    * - ``iris`` *(Development scaffold)*
      - ``eloialonso/iris`` (``pretrained_models/Breakout.pt``)
-     - IRIS Transformer world-model integration under development; inference is not implemented yet.
+     - IRIS Transformer world-model integration: Breakout supplied-action request
+       contract implemented; GPU inference is not implemented yet.
    * - ``chatterbox`` / ``chatterbox_multilingual`` / ``chatterbox_turbo``
      - ``ResembleAI/chatterbox``, ``ResembleAI/chatterbox-turbo``
      - Zero-shot voice-cloning TTS: T3 speech-token LM (Llama-520M, or GPT-2-medium

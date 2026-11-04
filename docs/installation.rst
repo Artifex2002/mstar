@@ -39,6 +39,12 @@ checkout. Keep ``--torch-backend=auto`` on every install, see the note below.
 Install from source
 -------------------
 
+For IRIS integration development, ``scripts/iris/README.md`` describes a separate
+reference rollout harness and ``scripts/iris/requirements-reference.txt`` its
+CPU dependencies. The reference source and published checkpoint are pinned and
+kept outside tracked model code. These are development tools, not a serving
+installation for IRIS.
+
 To work on the code, install from source in editable mode:
 
 .. code-block:: bash

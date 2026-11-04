@@ -1,0 +1,12 @@
+# Isolated CPU reference/test tooling; not IRIS serving dependencies.
+torch==2.12.1
+torchvision==0.27.1
+numpy==1.26.4
+gym==0.26.2
+einops==0.8.2
+omegaconf==2.4.0
+opencv-python==4.11.0.86
+Pillow==13.0.0
+requests==2.34.2
+tqdm==4.70.1
+psutil==7.2.2
