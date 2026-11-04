@@ -80,6 +80,14 @@ official traces, then checks real capture/replay, request departure, preplanning
 and handle reuse against static eager execution. Finally rerun the server with
 the capture config to check the actual asynchronous worker.
 
+A reported CUDA attempt completed the numerical stage, then failed at engine
+capture sizing because the adapter supplied `torch.device("cuda")` without an
+index. The graph backend's `torch.accelerator.set_device_index` requires an
+explicit ordinal. The adapter now resolves an implicit device to the current
+logical CUDA index and preserves explicit indices. CPU regressions exercise
+the exact PyTorch validation that rejected the original descriptor. The 37
+focused checks for this fix pass; CUDA capture/replay still needs its rerun.
+
 ## What to learn
 
 Explain why a CUDA graph needs stable addresses and shapes while values can

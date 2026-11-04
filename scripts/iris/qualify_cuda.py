@@ -27,6 +27,18 @@ def git_output(*args, cwd=None):
     return subprocess.check_output(["git", *args], cwd=cwd, text=True).strip()
 
 
+def indexed_cuda_device(device="cuda"):
+    """Resolve the same current GPU `.to('cuda')` uses for engine device selection.
+
+    The engine's graph backend calls set_device_index, which requires an ordinal.
+    Keep explicit ordinals intact, including logical CUDA_VISIBLE_DEVICES indices.
+    """
+    device = torch.device(device)
+    if device.type == "cuda" and device.index is None:
+        return torch.device("cuda", torch.cuda.current_device())
+    return device
+
+
 def require_cuda():
     if not torch.cuda.is_available() or torch.version.cuda is None:
         raise RuntimeError("A working NVIDIA CUDA PyTorch build and GPU are required; no CPU fallback is used")

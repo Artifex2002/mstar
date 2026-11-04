@@ -20,13 +20,14 @@ from mstar.engine.resources.kv.transfer import TransferEngineInfo
 from mstar.model.iris.config import IMAGINE_WALK
 from mstar.model.submodule_base import InputMetadata
 from scripts.iris.local_engine import LocalIrisEngine
+from scripts.iris.qualify_cuda import indexed_cuda_device
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class CapturedIrisEngine(LocalIrisEngine):
     def __init__(self, model, modules, device="cuda"):
-        self.model, self.device = model, torch.device(device)
+        self.model, self.device = model, indexed_cuda_device(device)
         self.horizons = {}
         self.replays, self.slots = Counter(), Counter()
         self.nodes = {id(module): node for node, module in modules.items()}

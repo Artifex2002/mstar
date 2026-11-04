@@ -62,6 +62,13 @@ Use new output directory names on reruns. The notebook's final cell downloads
 both reports and available logs. Send them even after failure. It is useful to
 retain the full output directories locally, including official traces.
 
+If an earlier run stopped at `engine_capture` with "Expected a torch.device
+with a specified index ... got:cuda", update `codex/iris` and retry into a new
+directory. The diagnostic adapter now resolves the current logical CUDA index
+before loading the engine, while preserving explicitly selected indices.
+This fix requires no Rust rebuild. The pinned Gym package's maintenance notice
+is separate from that exception; the qualification environment pins NumPy 1.26.
+
 ## What a pass establishes
 
 1. On CUDA, `torch_static` matches fresh official traces at B=1/B=2 through

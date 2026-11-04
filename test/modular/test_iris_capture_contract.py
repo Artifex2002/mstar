@@ -91,6 +91,40 @@ def test_capture_command_requires_cuda_and_saves_failure_report(tmp_path, monkey
     assert report["status"] == "failed" and report["stage"] == "cuda_preflight"
 
 
+@pytest.mark.parametrize(
+    "requested,expected,queries_current",
+    [
+        ("cuda", "cuda:2", True),
+        (torch.device("cuda"), "cuda:2", True),
+        ("cuda:0", "cuda:0", False),
+        ("cuda:3", "cuda:3", False),
+        ("cpu", "cpu", False),
+    ],
+)
+def test_capture_device_is_explicit_and_preserves_requested_ordinals(monkeypatch, requested, expected, queries_current):
+    from scripts.iris.qualify_cuda import indexed_cuda_device
+
+    queried = []
+
+    def current():
+        queried.append(True)
+        return 2
+
+    monkeypatch.setattr(torch.cuda, "current_device", current)
+    actual = indexed_cuda_device(requested)
+    assert actual == torch.device(expected)
+    assert bool(queried) == queries_current
+    if actual.type == "cuda":
+        from torch.accelerator._utils import _get_device_index
+
+        # Exercise the exact CPU-side validation used by set_device_index;
+        # no GPU device switch or accelerator initialization is needed.
+        monkeypatch.setattr(torch.accelerator, "current_accelerator", lambda: torch.device("cuda"))
+        with pytest.raises(ValueError, match="specified index"):
+            _get_device_index(torch.device("cuda"), optional=False)
+        assert _get_device_index(actual, optional=False) == actual.index
+
+
 def test_real_engine_loads_capture_model_and_optin_resources_on_cpu(monkeypatch):
     import triton.language as tl
 
