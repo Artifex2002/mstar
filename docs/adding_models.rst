@@ -578,6 +578,9 @@ described in ``scripts/iris/SERVER.md``. FP32 capture/replay and captured
 full-server correctness also passed on T4 at ``2ea19ee4``; evidence and scope
 are in ``docs/design/iris-step-05b.md``. That server run does not establish
 multirow batching; performance remains unmeasured.
+The scoped baseline harness in ``benchmark/iris/README.md`` separates standalone
+rollouts from HTTP serving and records actual worker batch histogram deltas.
+Its CPU checks pass; GPU benchmark validation remains pending.
 
 ``get_node_resources`` returns a flat list of ``NodeResourceSpec`` objects. Every spec has
 these common members:

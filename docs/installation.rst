@@ -65,6 +65,13 @@ full-server correctness passed on T4 at ``2ea19ee4``; see
 ``docs/design/iris-step-05b.md`` for evidence and limits. Performance remains
 unmeasured.
 
+The IRIS baseline benchmark uses that same Python environment and the versioned
+benchmarking server launcher. It additionally needs Linux ``ss``, ``setsid``,
+``curl``, ``ps`` and ``nvidia-smi`` on PATH (Debian/Ubuntu packages:
+``iproute2``, ``util-linux``, ``curl``, ``procps``, plus the installed NVIDIA
+driver tools). See ``benchmark/iris/README.md`` and
+``scripts/iris/benchmark_colab.ipynb`` for setup and the initial batching audit.
+
 To work on the code, install from source in editable mode:
 
 .. code-block:: bash

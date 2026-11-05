@@ -28,6 +28,8 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
        ``docs/design/iris-step-05b.md`` for evidence and limits, including server
        multirow batching not established by that run. Performance is unmeasured.
        Capture setup: ``scripts/iris/CAPTURE.md``.
+       Baseline benchmark and batching audit: ``benchmark/iris/README.md``
+       (CUDA benchmark validation pending).
    * - ``chatterbox`` / ``chatterbox_multilingual`` / ``chatterbox_turbo``
      - ``ResembleAI/chatterbox``, ``ResembleAI/chatterbox-turbo``
      - Zero-shot voice-cloning TTS: T3 speech-token LM (Llama-520M, or GPT-2-medium

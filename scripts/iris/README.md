@@ -201,3 +201,8 @@ records passed eager/captured qualification on T4 and the limits of the batching
 evidence. Use [CAPTURE.md](CAPTURE.md) for the separate captured configuration.
 Performance remains unmeasured. See [the Step 4 lesson](../../docs/design/iris-step-04.md)
 for the original eager implementation.
+
+For the next experiment, use the [baseline benchmark](../../benchmark/iris/README.md)
+and [Step 5c lesson](../../docs/design/iris-step-05c.md). Start with worker batching
+evidence, then compare official/eager/captured standalone rollouts and M* HTTP
+serving as separate scopes. The benchmark's CUDA validation is pending.

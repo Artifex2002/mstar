@@ -26,6 +26,9 @@ qualification harness and records its successful GPU run.
 The [Step 5b walkthrough](iris-step-05b.md) implements experimental capture-compatible
 attention and engine-managed CUDA graphs, and records their passed T4 checks.
 Use the [CUDA capture qualification guide](../../scripts/iris/CAPTURE.md) to reproduce them.
+The [Step 5c walkthrough](iris-step-05c.md) adds a batching audit and separate
+standalone/HTTP benchmarks. Its CPU checks pass; GPU benchmark validation and
+performance results are pending.
 
 ## Benchmark objective
 

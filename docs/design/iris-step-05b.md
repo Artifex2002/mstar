@@ -190,8 +190,8 @@ padding must describe valid independent rows, and why Python branch choices
 belong in a capture key. Distinguish compiling tensor programs from replaying
 their launches: this step tests replay without also changing compiler behavior.
 
-Both GPU reports now pass for the recorded scope. Next, build a timing harness,
-verify actual worker batch sizes and collect eager/captured baselines before
-further tuning. Read the repository's benchmarking
+Both GPU reports now pass for the recorded scope. The [Step 5c harness](iris-step-05c.md)
+is ready for its first GPU run: verify actual worker batch sizes and collect
+official/eager/captured baselines before further tuning. Read the repository's benchmarking
 skill and use worker phases to identify CPU versus GPU work. Neither successful
 capture nor this diagnostic driver's wall time establishes a speedup.
