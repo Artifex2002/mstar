@@ -8,7 +8,9 @@ the user-provided [Tesla T4 report](iris-t4-qualification.json) records clean
 commit `caf2f45a`, PyTorch 2.12.1+cu132 and FlashInfer 0.7.2. The subsequent
 [full-server T4 run](iris-t4-server-qualification.json) passed on clean commit
 `ac98d64a`, including seeded HTTP parity, concurrency, cancellation and cleanup.
-CUDA graphs and performance are not yet qualified. The learner can
+Direct CUDA capture/replay and captured full-server correctness passed on T4 at
+clean commit `2ea19ee4`; see the [capture evidence and limits](iris-step-05b.md#t4-qualification-evidence).
+Server multirow batching remains to be established and performance is unmeasured. The learner can
 repeat the changes independently on an `iris` branch using the
 [Step 1 lesson](iris-step-01.md).
 Continue with the [Step 2 contract walkthrough](iris-step-02.md).
@@ -22,8 +24,8 @@ The [Step 5a walkthrough](iris-step-05.md) adds eager batching and an executable
 The [server continuation](iris-step-05-server.md) adds a real HTTP/native-worker
 qualification harness and records its successful GPU run.
 The [Step 5b walkthrough](iris-step-05b.md) implements experimental capture-compatible
-attention and engine-managed CUDA graphs;
-[CUDA capture qualification](../../scripts/iris/CAPTURE.md) remains pending.
+attention and engine-managed CUDA graphs, and records their passed T4 checks.
+Use the [CUDA capture qualification guide](../../scripts/iris/CAPTURE.md) to reproduce them.
 
 ## Benchmark objective
 

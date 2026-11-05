@@ -23,9 +23,11 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
        contract, resources, graph and batched eager FP32 submodules implemented. Official
        checkpoint parity checked on CPU and Tesla T4 (B=1/2). Eager full-server
        correctness also passed on T4 at ``ac98d64a``; see
-       ``docs/design/iris-t4-server-qualification.json``. CUDA graphs and
-       performance remain unvalidated.
-       Experimental capture setup: ``scripts/iris/CAPTURE.md``.
+       ``docs/design/iris-t4-server-qualification.json``. FP32 capture/replay and
+       captured full-server correctness passed on T4 at ``2ea19ee4``; see
+       ``docs/design/iris-step-05b.md`` for evidence and limits, including server
+       multirow batching not established by that run. Performance is unmeasured.
+       Capture setup: ``scripts/iris/CAPTURE.md``.
    * - ``chatterbox`` / ``chatterbox_multilingual`` / ``chatterbox_turbo``
      - ``ResembleAI/chatterbox``, ``ResembleAI/chatterbox-turbo``
      - Zero-shot voice-cloning TTS: T3 speech-token LM (Llama-520M, or GPT-2-medium

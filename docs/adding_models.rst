@@ -574,7 +574,10 @@ including official-checkpoint numerical comparisons. Eager CUDA numerical and
 sampling checks also passed on Tesla T4; see ``docs/design/iris-step-05.md``.
 Eager full-server qualification passed on T4 at ``ac98d64a``; the evidence is
 in ``docs/design/iris-t4-server-qualification.json``, with the runnable harness
-described in ``scripts/iris/SERVER.md``. Capture and performance remain pending.
+described in ``scripts/iris/SERVER.md``. FP32 capture/replay and captured
+full-server correctness also passed on T4 at ``2ea19ee4``; evidence and scope
+are in ``docs/design/iris-step-05b.md``. That server run does not establish
+multirow batching; performance remains unmeasured.
 
 ``get_node_resources`` returns a flat list of ``NodeResourceSpec`` objects. Every spec has
 these common members:

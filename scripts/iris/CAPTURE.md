@@ -2,9 +2,13 @@
 
 The [eager full-server gate](../../docs/design/iris-t4-server-qualification.json)
 passed on T4 at `ac98d64a`. This experimental step adds capture recipes and a
-fixed-layout attention backend. Its CUDA acceptance run is **pending**. There
-is no speedup claim, and the existing `configs/iris.yaml` remains the qualified
-eager configuration.
+fixed-layout attention backend. **Direct capture/replay and captured full-server
+correctness passed on Tesla T4 at clean commit `2ea19ee4`**, using PyTorch
+2.12.1+cu132. See the [direct report](../../docs/design/iris-t4-capture-qualification.json),
+[server report](../../docs/design/iris-t4-capture-server-qualification.json) and
+[evidence notes](../../docs/design/iris-step-05b.md#t4-qualification-evidence).
+Server multirow batching was not established by that run, and performance is
+unmeasured. `configs/iris.yaml` remains the eager configuration.
 
 Use [qualify_capture_colab.ipynb](qualify_capture_colab.ipynb) on a Linux NVIDIA
 GPU. The notebook can prepare a fresh checkout/environment or reuse the previous

@@ -196,5 +196,8 @@ This must report a pass, not a skip. It executes a 20-frame rollout through the
 real eager submodules/resources, including context refresh. It does not launch
 the API server or establish numerical GPU parity against official IRIS. Those
 checks remain required before benchmarking. `configs/iris.yaml` opts into the
-eager `torch` attention backends; compilation, capture and batching are deferred.
-See [the Step 4 lesson](../../docs/design/iris-step-04.md).
+eager `torch` attention backends. The later [Step 5b lesson](../../docs/design/iris-step-05b.md)
+records passed eager/captured qualification on T4 and the limits of the batching
+evidence. Use [CAPTURE.md](CAPTURE.md) for the separate captured configuration.
+Performance remains unmeasured. See [the Step 4 lesson](../../docs/design/iris-step-04.md)
+for the original eager implementation.

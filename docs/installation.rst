@@ -60,8 +60,10 @@ FP32 execution; accelerator graphs and performance measurements are separate.
 The experimental IRIS capture path uses the same serving dependencies plus the
 reference requirements for regenerating official CUDA traces. Setup and GPU
 acceptance commands are in ``scripts/iris/CAPTURE.md`` and
-``scripts/iris/qualify_capture_colab.ipynb``. Capture qualification is pending;
-the eager deployment remains the validated baseline.
+``scripts/iris/qualify_capture_colab.ipynb``. FP32 capture/replay and captured
+full-server correctness passed on T4 at ``2ea19ee4``; see
+``docs/design/iris-step-05b.md`` for evidence and limits. Performance remains
+unmeasured.
 
 To work on the code, install from source in editable mode:
 

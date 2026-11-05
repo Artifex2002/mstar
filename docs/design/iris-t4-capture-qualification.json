@@ -1,0 +1,140 @@
+{
+  "status": "passed",
+  "stage": "complete",
+  "started_utc": "2026-11-04T23:30:00.853312+00:00",
+  "mstar_commit": "2ea19ee46d380fdad3a285a15f882b276253c92b",
+  "working_tree_status": "",
+  "purpose": "FP32 attention parity and engine-managed CUDA capture/replay correctness; no timing claims",
+  "build_tools": {
+    "ninja": "/content/mstar-iris/.venv/bin/ninja",
+    "ninja_version": "1.13.2.git.kitware.jobserver-pipe-1"
+  },
+  "hardware": {
+    "gpu": "Tesla T4",
+    "torch": "2.12.1+cu132",
+    "cuda_build": "13.2",
+    "rust_extension": "0.1.1"
+  },
+  "checkpoint_sha256": "169e3669b7d1901990b4ebce35ff8f3355610fae393e6a587fd62c40faf790f4",
+  "reference_commit": "24326aaaa283c527f42b89b44cfdecf2665a7a16",
+  "static_attention_parity": [
+    {
+      "batch_size": 1,
+      "horizon": 20,
+      "decoded_frames": 20,
+      "world_batch_calls": 342,
+      "world_row_calls": 342,
+      "tensors_checked": 1430,
+      "max_abs_errors": {
+        "encoder_codes": 0,
+        "initial_rgb": 2.682209014892578e-07,
+        "output_sequence": 2.086162567138672e-06,
+        "logits_observations": 4.57763671875e-05,
+        "logits_rewards": 7.62939453125e-06,
+        "logits_ends": 1.9073486328125e-06,
+        "predicted_rgb": 1.1146068572998047e-05,
+        "reward": 0,
+        "ending": 0
+      }
+    },
+    {
+      "batch_size": 2,
+      "horizon": 20,
+      "decoded_frames": 40,
+      "world_batch_calls": 342,
+      "world_row_calls": 684,
+      "tensors_checked": 1470,
+      "max_abs_errors": {
+        "encoder_codes": 0,
+        "initial_rgb": 5.781650543212891e-06,
+        "output_sequence": 3.337860107421875e-06,
+        "logits_observations": 6.103515625e-05,
+        "logits_rewards": 7.62939453125e-06,
+        "logits_ends": 3.039836883544922e-06,
+        "predicted_rgb": 1.0579824447631836e-05,
+        "reward": 0,
+        "ending": 0
+      }
+    }
+  ],
+  "captures": {
+    "image_encoder": {
+      "buckets": 2,
+      "slots_per_bucket": 2
+    },
+    "world_model": {
+      "buckets": 72,
+      "slots_per_bucket": 2
+    },
+    "image_decoder": {
+      "buckets": 2,
+      "slots_per_bucket": 2
+    },
+    "initial_image_decoder": {
+      "buckets": 2,
+      "slots_per_bucket": 2
+    }
+  },
+  "replay": {
+    "teacher_forced_official_parity": {
+      "tensors_checked": 1589,
+      "max_abs_errors": {
+        "encoder_codes": 0,
+        "output_sequence": 2.86102294921875e-06,
+        "logits_observations": 5.340576171875e-05,
+        "logits_rewards": 7.62939453125e-06,
+        "logits_ends": 1.9073486328125e-06
+      }
+    },
+    "max_rgb24_error": 1,
+    "captured_sampling_repeatability": {
+      "status": "exact",
+      "tensor_fingerprints_compared": 2912
+    },
+    "cross_algorithm_seed_identity": "not required: eager FlashInfer and captured fused_sample differ",
+    "rng_counters": {
+      "H2": {
+        "observation_sampler": 32,
+        "reward_sampler": 2,
+        "ending_sampler": 2
+      },
+      "H20": {
+        "observation_sampler": 320,
+        "reward_sampler": 20,
+        "ending_sampler": 20
+      },
+      "H1": {
+        "observation_sampler": 16,
+        "reward_sampler": 1,
+        "ending_sampler": 1
+      }
+    },
+    "horizons": [
+      20,
+      2
+    ],
+    "handle_reuse": "passed",
+    "padded_replays": 63,
+    "preplanned_world_steps": 1080,
+    "engine_run_forward_calls": {
+      "image_encoder": 6,
+      "initial_image_decoder": 6,
+      "world_model": 1080,
+      "image_decoder": 63
+    },
+    "replay_slots": {
+      "image_encoder:0": 3,
+      "initial_image_decoder:0": 3,
+      "world_model:0": 540,
+      "world_model:1": 540,
+      "image_decoder:0": 32,
+      "image_decoder:1": 31,
+      "image_encoder:1": 3,
+      "initial_image_decoder:1": 3
+    },
+    "kv_pages_after_cleanup": {
+      "used": 0,
+      "cached": 0
+    }
+  }
+}
