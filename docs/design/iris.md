@@ -27,8 +27,9 @@ The [Step 5b walkthrough](iris-step-05b.md) implements experimental capture-comp
 attention and engine-managed CUDA graphs, and records their passed T4 checks.
 Use the [CUDA capture qualification guide](../../scripts/iris/CAPTURE.md) to reproduce them.
 The [Step 5c walkthrough](iris-step-05c.md) adds a batching audit and separate
-standalone/HTTP benchmarks. Its CPU checks pass; GPU benchmark validation and
-performance results are pending.
+standalone/HTTP benchmarks. Its T4 audit passed: eager selected multirow worker
+steps, while captured serving ran single rows in that workload. Standalone GPU
+benchmark validation and final uninstrumented performance results are pending.
 
 ## Benchmark objective
 

@@ -1,8 +1,10 @@
 # IRIS baseline benchmark
 
 This follows the [passed T4 correctness gates](../../docs/design/iris-step-05b.md#t4-qualification-evidence).
-The benchmark is CPU-checked; **its CUDA execution and performance results are
-pending**. Do not infer a speedup from successful capture or from qualification
+The [T4 batching/phase audit](../../docs/design/iris-step-05c.md#t4-batching-audit-evidence)
+passed at `4b8db96e`: eager C=2 selected multirow worker steps; captured C=2 ran
+single-row steps. **Standalone GPU benchmark validation and uninstrumented
+performance results remain pending**. Do not infer a speedup from successful capture or from qualification
 wall times. Run on one otherwise idle Linux NVIDIA allocation, using the same
 GPU and checkout for every arm. Stop the qualification servers first.
 
@@ -72,8 +74,8 @@ read `world_multirow_observed` and each component's `two_row_steps`. Missing
 metrics are an error, never evidence of zero batching. Keep the raw `.prom`
 files: the earlier qualification archive did not include them.
 
-After the audit is understood, a complete sweep repeats the audit and runs
-three interleaved rounds, each with fresh model/server processes:
+After the audit is understood, measure three interleaved rounds with fresh
+model/server processes. `--stage timings` skips the completed audit:
 
 ```bash
 %%bash
@@ -81,7 +83,7 @@ set -euo pipefail
 cd /content/mstar-iris
 source .venv/bin/activate
 mkdir -p .ci-results/iris
-OMP_NUM_THREADS=2 python -m benchmark.iris.run \
+OMP_NUM_THREADS=2 python -m benchmark.iris.run --stage timings \
   --download-checkpoint --rounds 3 --samples 5 --requests 10 --warmup-waves 5 \
   --output .ci-results/iris/benchmark-01 \
   2>&1 | tee .ci-results/iris/benchmark-01.log
@@ -105,13 +107,18 @@ failed or truncated response invalidates its cell. Standalone setup, weights
 loading and graph capture are outside timing, followed by five warmup rollouts
 per shape and five measured rollouts. Each HTTP cell warms five waves at that
 cell's concurrency, then measures ten requests (at least 5x maximum concurrency).
+The default `--stage all` includes the audit as well as the timing sweep for a
+fresh allocation where no audit evidence has been collected.
 `summary.tsv` keeps each fresh-process round separate. Standalone output hashes
 are computed outside timing and must repeat within one process after request
 teardown; cross-algorithm hashes are not required to agree.
 
 `batching_audit` has per-node deltas from drained before/after metric snapshots:
-step count, row-step sum, B=1/B=2 step counts and mean rows. These describe the
-forward's actual rows, not requests in flight or padded graph bucket width.
+step count, row-step sum, one-row/two-row step counts and mean rows. These
+describe worker-step input rows, not requests in flight, padded graph bucket
+width or necessarily neural forward width. Incompatible eager rows can run
+through the Engine's per-request fallback. The T4 phase log is consistent with
+that split even for eager two-row worker steps; see the evidence notes.
 For each audit server, `worker-phases.txt` uses the repo's existing parser and
 segmentation. Check steady segments in `server.log` before interpreting means.
 `worker.postprocess.event_sync` is the real GPU wait; `await_gpu` is a host-thread

@@ -4,6 +4,7 @@ import io
 import json
 import struct
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
 from types import SimpleNamespace
@@ -16,6 +17,53 @@ import torch
 
 from benchmark.iris import http
 from benchmark.iris.common import batching_delta, summarize, workload
+
+
+def test_timings_stage_skips_audit_and_alternates_uninstrumented_arms(tmp_path, monkeypatch):
+    from benchmark.iris import run
+
+    monkeypatch.setenv("MSTAR_PHASE_TIMING", "100")
+    arms, servers = [], []
+
+    def standalone(command, **kwargs):
+        assert kwargs["env"]["MSTAR_PHASE_TIMING"] == "0"
+        arm = command[command.index("--arm") + 1]
+        arms.append(arm)
+        target = Path(command[command.index("--output") + 1])
+        target.write_text(
+            json.dumps({"status": "passed", "arm": arm, "results": [{"batch": 1, "horizon": 20, **summarize([1], 20)}]})
+        )
+
+    @contextmanager
+    def server(checkpoint, output, captured, phase_period=0, port=8123):
+        assert phase_period == 0
+        servers.append(captured)
+        yield "http://unused"
+
+    monkeypatch.setattr(run.subprocess, "run", standalone)
+    monkeypatch.setattr(http, "server", server)
+    monkeypatch.setattr(http, "http_cells", lambda *args: [{"concurrency": 1, "horizon": 20, **summarize([1], 20)}])
+    monkeypatch.setattr(run, "gpu_snapshot", lambda path: None)
+    monkeypatch.setattr(run, "verify_sources", lambda report: None)
+    report = {}
+    args = SimpleNamespace(
+        stage="timings",
+        rounds=2,
+        output=tmp_path,
+        checkpoint=tmp_path / "Breakout.pt",
+        reference_root=tmp_path,
+        warmup_waves=5,
+        requests=10,
+        port=8123,
+        samples=5,
+    )
+    run.run_cells(args, report, lambda: None)
+    assert arms == ["official", "eager", "captured", "captured", "eager", "official"]
+    assert servers == [False, True, True, False]
+    assert "batching_audit" not in report and report["status"] == "passed"
+    assert len(report["standalone"]) == 6 and len(report["http"]) == 4
+    assert len((tmp_path / "summary.tsv").read_text().splitlines()) == 11
+    assert run.os.environ["MSTAR_PHASE_TIMING"] == "100"
 
 
 @pytest.mark.parametrize("captured", [False, True])

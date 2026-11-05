@@ -1,0 +1,664 @@
+{
+  "status": "passed",
+  "stage": "complete",
+  "started_utc": "2026-11-05T01:33:20.301007+00:00",
+  "mstar_commit": "4b8db96e39fc1ceeba4b572885d050b08e375b9a",
+  "reference_commit": "24326aaaa283c527f42b89b44cfdecf2665a7a16",
+  "parameters": {
+    "output": "/content/mstar-iris/.ci-results/iris/benchmark-audit-02",
+    "checkpoint": "/content/mstar-iris/.ci-results/iris/Breakout.pt",
+    "reference_root": "/content/mstar-iris/.ci-results/iris/reference",
+    "download_checkpoint": true,
+    "stage": "audit",
+    "rounds": 3,
+    "requests": 10,
+    "samples": 5,
+    "warmup_waves": 5,
+    "port": 8123
+  },
+  "source_sha256": {
+    "benchmark/iris/__init__.py": "8a9c1110f07bad02c9ecd328fa6d8c4e28662d415752af0bb087b876dcbeeb03",
+    "benchmark/iris/common.py": "a8e9c08e86f9f3accb8679f52c4fdc5f4cf208bfa42aae4ac5c762f83ca0a19b",
+    "benchmark/iris/http.py": "85340ee5e045b0e4992ba56db4b4b820a76763e0fc2273875793e513a1d8f2b3",
+    "benchmark/iris/run.py": "4d2d4991d2ac13b64ce94909913642b3840775a1bd02baccf989e8841e68eed2",
+    "benchmark/iris/standalone.py": "8f774ca755d650f5ade0c164086620f23acbca81e8615ec3bd6f776cc07bd0c3",
+    "configs/iris.yaml": "eb20efeeb7f8f3713d1d3511b30734dc2714351e0e91b6a033d10213599eede9",
+    "configs/iris_capture.yaml": "bdb9b8a0782d43093ccd1bb932ab11ecf0442948812c3b4bd6faee0b2abe5783"
+  },
+  "cuda_visible_devices": null,
+  "contract": {
+    "standalone": "GPU inputs; reset/initial decode, H actions, RGB24/reward/end D2H per frame, teardown",
+    "http": "PNG upload through native binary stream; closed loop; phase timing disabled in timed boots",
+    "precision": "FP32, highest matmul, TF32 disabled; torch.compile disabled in every arm",
+    "sampling": "official Categorical / eager FlashInfer / captured fused_sample; draws can differ by backend",
+    "workload": "Breakout supplied actions, synthetic RGB64 PNG variants 0/1; H=1/20 standalone, H=20 HTTP",
+    "comparison_scope": "compare rates only within the same scope and B or concurrency; no vLLM-Omni arm"
+  },
+  "preflight": {
+    "cuda_probe": {
+      "torch": "2.12.1+cu132",
+      "cuda": "13.2",
+      "gpu": "Tesla T4"
+    },
+    "build_tools": {
+      "ninja": "/content/mstar-iris/.venv/bin/ninja",
+      "ninja_version": "1.13.2.git.kitware.jobserver-pipe-1"
+    },
+    "checkpoint_sha256": "169e3669b7d1901990b4ebce35ff8f3355610fae393e6a587fd62c40faf790f4"
+  },
+  "versions": {
+    "mstar-ai": "0.2.1",
+    "torch": "2.12.1+cu132",
+    "numpy": "1.26.4",
+    "flashinfer-python": "0.7.2",
+    "triton": "3.7.1"
+  },
+  "batching_audit": {
+    "eager": {
+      "cells": [
+        {
+          "completed": 10,
+          "failed": 0,
+          "wall_seconds": 57.15238700500004,
+          "latency_ms": {
+            "p50": 5581.093673000169,
+            "p95": 6144.380346599883,
+            "p99": 6174.022520519957
+          },
+          "mean_latency_ms": 5713.889725799891,
+          "frames": 200,
+          "frames_per_second": 3.4994163932733517,
+          "requests_per_second": 0.1749708196636676,
+          "first_frame_ms": {
+            "p50": 317.41841699999895,
+            "p95": 406.76903874984873,
+            "p99": 416.2036469498571
+          },
+          "output_bytes": 2458600,
+          "requests": [
+            {
+              "seconds": 5.444795918999716,
+              "first_frame_seconds": 0.30838807899999665,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 6.0889272949998485,
+              "first_frame_seconds": 0.3236712590000934,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 5.258564012999614,
+              "first_frame_seconds": 0.3051088180000079,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 5.583906354000192,
+              "first_frame_seconds": 0.3126203000001624,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 5.895939002999967,
+              "first_frame_seconds": 0.39235505399983595,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 5.5782809920001455,
+              "first_frame_seconds": 0.3130768959999841,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 6.181433063999975,
+              "first_frame_seconds": 0.3324223549998351,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 5.496860449999986,
+              "first_frame_seconds": 0.3045805050001036,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 6.099093691999769,
+              "first_frame_seconds": 0.3217599380000138,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 5.511096475999693,
+              "first_frame_seconds": 0.4185622989998592,
+              "frames": 20,
+              "output_bytes": 245860
+            }
+          ],
+          "concurrency": 1,
+          "horizon": 20,
+          "batching": {
+            "available": true,
+            "components": {
+              "image_encoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "world_model": {
+                "steps": 3420.0,
+                "row_steps": 3420.0,
+                "single_row_steps": 3420.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "initial_image_decoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "image_decoder": {
+                "steps": 200.0,
+                "row_steps": 200.0,
+                "single_row_steps": 200.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              }
+            }
+          },
+          "cleanup": {
+            "complete": true,
+            "idle": true,
+            "api_in_flight": [
+              0.0
+            ],
+            "conductor": {
+              "waiting": [
+                0.0
+              ],
+              "running": [
+                0.0
+              ],
+              "draining": [
+                0.0
+              ]
+            },
+            "kv_pages_used": [
+              0.0
+            ],
+            "kv_pages_cached": [
+              0.0
+            ],
+            "status_age_seconds": [
+              0.09761101699996289
+            ],
+            "success": 15.0,
+            "aborts": 0.0,
+            "steps_with_more_than_one_row": 0.0
+          },
+          "timing_scope": "diagnostic only: phase instrumentation enabled; excluded from throughput comparisons"
+        },
+        {
+          "completed": 10,
+          "failed": 0,
+          "wall_seconds": 54.38758113199992,
+          "latency_ms": {
+            "p50": 10976.166056000011,
+            "p95": 11087.325922349852,
+            "p99": 11088.500615669895
+          },
+          "mean_latency_ms": 10870.364108600006,
+          "frames": 200,
+          "frames_per_second": 3.6773100740515625,
+          "requests_per_second": 0.18386550370257812,
+          "first_frame_ms": {
+            "p50": 619.6316284997465,
+            "p95": 761.4181593999774,
+            "p99": 780.4931582799463
+          },
+          "output_bytes": 2458600,
+          "requests": [
+            {
+              "seconds": 10.994074317000013,
+              "first_frame_seconds": 0.5411368039999616,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 11.085531251999782,
+              "first_frame_seconds": 0.620813552999607,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 10.932247396000093,
+              "first_frame_seconds": 0.618449703999886,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 10.917471495999962,
+              "first_frame_seconds": 0.6060618520000389,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 10.310660983000162,
+              "first_frame_seconds": 0.7116905530001532,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 10.373189922000165,
+              "first_frame_seconds": 0.7121026630002234,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 11.088794288999907,
+              "first_frame_seconds": 0.7852619079999386,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 11.039875499000118,
+              "first_frame_seconds": 0.7322758000000249,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 11.00353813699985,
+              "first_frame_seconds": 0.5886522539999532,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 10.958257795000009,
+              "first_frame_seconds": 0.5938609720001295,
+              "frames": 20,
+              "output_bytes": 245860
+            }
+          ],
+          "concurrency": 2,
+          "horizon": 20,
+          "batching": {
+            "available": true,
+            "components": {
+              "image_encoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "world_model": {
+                "steps": 1915.0,
+                "row_steps": 3420.0,
+                "single_row_steps": 410.0,
+                "two_row_steps": 1505.0,
+                "mean_rows": 1.7859007832898173
+              },
+              "initial_image_decoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "image_decoder": {
+                "steps": 200.0,
+                "row_steps": 200.0,
+                "single_row_steps": 200.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              }
+            }
+          },
+          "cleanup": {
+            "complete": true,
+            "idle": true,
+            "api_in_flight": [
+              0.0
+            ],
+            "conductor": {
+              "waiting": [
+                0.0
+              ],
+              "running": [
+                0.0
+              ],
+              "draining": [
+                0.0
+              ]
+            },
+            "kv_pages_used": [
+              0.0
+            ],
+            "kv_pages_cached": [
+              0.0
+            ],
+            "status_age_seconds": [
+              0.3156118440001592
+            ],
+            "success": 35.0,
+            "aborts": 0.0,
+            "steps_with_more_than_one_row": 3010.0
+          },
+          "timing_scope": "diagnostic only: phase instrumentation enabled; excluded from throughput comparisons"
+        }
+      ],
+      "phase_records": 100,
+      "world_multirow_observed": true
+    },
+    "captured": {
+      "cells": [
+        {
+          "completed": 10,
+          "failed": 0,
+          "wall_seconds": 16.078873133999878,
+          "latency_ms": {
+            "p50": 1567.5143835003382,
+            "p95": 1751.8288918497547,
+            "p99": 1762.7878919696286
+          },
+          "mean_latency_ms": 1606.1574637000376,
+          "frames": 200,
+          "frames_per_second": 12.438682632372185,
+          "requests_per_second": 0.6219341316186092,
+          "first_frame_ms": {
+            "p50": 96.96835150020888,
+            "p95": 115.3931319499179,
+            "p99": 121.69475518975105
+          },
+          "output_bytes": 2458600,
+          "requests": [
+            {
+              "seconds": 1.5418752220002716,
+              "first_frame_seconds": 0.09693381600027351,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.567320748000384,
+              "first_frame_seconds": 0.1006457120001869,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.5677080190002926,
+              "first_frame_seconds": 0.09442970800000694,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.5697362979999525,
+              "first_frame_seconds": 0.09095941099985794,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.765527641999597,
+              "first_frame_seconds": 0.09527761799972723,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.7350859749999472,
+              "first_frame_seconds": 0.10576565200017285,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.6717354560000786,
+              "first_frame_seconds": 0.12327016099970933,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.5504636599998776,
+              "first_frame_seconds": 0.09717266300003757,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.5600811350000185,
+              "first_frame_seconds": 0.08870586000011826,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 1.5320404819999567,
+              "first_frame_seconds": 0.09700288700014426,
+              "frames": 20,
+              "output_bytes": 245860
+            }
+          ],
+          "concurrency": 1,
+          "horizon": 20,
+          "batching": {
+            "available": true,
+            "components": {
+              "image_encoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "world_model": {
+                "steps": 3420.0,
+                "row_steps": 3420.0,
+                "single_row_steps": 3420.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "initial_image_decoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "image_decoder": {
+                "steps": 200.0,
+                "row_steps": 200.0,
+                "single_row_steps": 200.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              }
+            }
+          },
+          "cleanup": {
+            "complete": true,
+            "idle": true,
+            "api_in_flight": [
+              0.0
+            ],
+            "conductor": {
+              "waiting": [
+                0.0
+              ],
+              "running": [
+                0.0
+              ],
+              "draining": [
+                0.0
+              ]
+            },
+            "kv_pages_used": [
+              0.0
+            ],
+            "kv_pages_cached": [
+              0.0
+            ],
+            "status_age_seconds": [
+              0.15421602399965195
+            ],
+            "success": 15.0,
+            "aborts": 0.0,
+            "steps_with_more_than_one_row": 0.0
+          },
+          "timing_scope": "diagnostic only: phase instrumentation enabled; excluded from throughput comparisons"
+        },
+        {
+          "completed": 10,
+          "failed": 0,
+          "wall_seconds": 16.28102182700013,
+          "latency_ms": {
+            "p50": 3199.1998769999554,
+            "p95": 3442.0054231999075,
+            "p99": 3444.1335934400468
+          },
+          "mean_latency_ms": 3251.4965514999403,
+          "frames": 200,
+          "frames_per_second": 12.284241254951448,
+          "requests_per_second": 0.6142120627475723,
+          "first_frame_ms": {
+            "p50": 194.14930049993018,
+            "p95": 231.52894749987354,
+            "p99": 233.77208229991993
+          },
+          "output_bytes": 2458600,
+          "requests": [
+            {
+              "seconds": 3.106998972999918,
+              "first_frame_seconds": 0.20154784199985443,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.094578599000215,
+              "first_frame_seconds": 0.18251180400011435,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.182529739000074,
+              "first_frame_seconds": 0.1815216190002502,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.1840166570000292,
+              "first_frame_seconds": 0.18520205899994835,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.3285533569996915,
+              "first_frame_seconds": 0.19223698399991918,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.3364687479997883,
+              "first_frame_seconds": 0.19526535400018474,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.4446656360000816,
+              "first_frame_seconds": 0.23433286599993153,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.4387540519996946,
+              "first_frame_seconds": 0.22810193599980266,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.201253718999851,
+              "first_frame_seconds": 0.19386996499997622,
+              "frames": 20,
+              "output_bytes": 245860
+            },
+            {
+              "seconds": 3.19714603500006,
+              "first_frame_seconds": 0.19442863599988414,
+              "frames": 20,
+              "output_bytes": 245860
+            }
+          ],
+          "concurrency": 2,
+          "horizon": 20,
+          "batching": {
+            "available": true,
+            "components": {
+              "image_encoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "world_model": {
+                "steps": 3420.0,
+                "row_steps": 3420.0,
+                "single_row_steps": 3420.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "initial_image_decoder": {
+                "steps": 10.0,
+                "row_steps": 10.0,
+                "single_row_steps": 10.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              },
+              "image_decoder": {
+                "steps": 200.0,
+                "row_steps": 200.0,
+                "single_row_steps": 200.0,
+                "two_row_steps": 0.0,
+                "mean_rows": 1.0
+              }
+            }
+          },
+          "cleanup": {
+            "complete": true,
+            "idle": true,
+            "api_in_flight": [
+              0.0
+            ],
+            "conductor": {
+              "waiting": [
+                0.0
+              ],
+              "running": [
+                0.0
+              ],
+              "draining": [
+                0.0
+              ]
+            },
+            "kv_pages_used": [
+              0.0
+            ],
+            "kv_pages_cached": [
+              0.0
+            ],
+            "status_age_seconds": [
+              0.15758181199998944
+            ],
+            "success": 35.0,
+            "aborts": 0.0,
+            "steps_with_more_than_one_row": 0.0
+          },
+          "timing_scope": "diagnostic only: phase instrumentation enabled; excluded from throughput comparisons"
+        }
+      ],
+      "phase_records": 133,
+      "world_multirow_observed": false
+    }
+  },
+  "standalone": [],
+  "http": []
+}

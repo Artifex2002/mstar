@@ -1,9 +1,10 @@
 # IRIS Step 5c: measure the baseline
 
 This follows the [capture correctness gates](iris-step-05b.md#t4-qualification-evidence).
-The benchmark implementation is CPU-checked. **CUDA benchmark validation and
-performance results are pending.** The first GPU run is the batching/phase
-audit; retain its raw metrics even if the audit fails.
+**The batching/phase audit passed on Tesla T4 at clean commit `4b8db96e`.**
+Eager multirow worker selection was observed; captured serving used single rows in this
+run. Standalone GPU benchmark validation and the uninstrumented performance
+sweep remain pending. Retain raw metrics even if an audit fails.
 
 Local validation on macOS with `OMP_NUM_THREADS=2`: 83 focused tests passed
 (18 benchmark tests plus IRIS capture/server and worker-phase regressions),
@@ -17,10 +18,68 @@ The benchmark launcher now supplies 16 MiB segments and a four-segment cap
 values in `launch.json` and leaves M*'s global defaults alone. A CPU regression
 calls the real arena constructor with reported Colab capacity: the old defaults
 raise the original error, while both benchmark launch paths pass that guard and
-reach native arena creation (intercepted before allocation). Full GPU startup,
-batching evidence and timings still require the rerun.
+reach native arena creation (intercepted before allocation). The subsequent
+GPU startup and audit passed as recorded below; final timings are still pending.
 For this correction, all 85 focused CPU checks pass, including the eager and
 captured launcher regressions; Ruff and diff checks pass too.
+
+## T4 batching audit evidence
+
+The user supplied `iris-benchmark-audit-02.zip` from clean commit
+`4b8db96e39fc1ceeba4b572885d050b08e375b9a`, Tesla T4, PyTorch 2.12.1+cu132,
+CUDA build 13.2, FlashInfer 0.7.2 and Triton 3.7.1. The original report bytes
+are preserved in [iris-t4-batching-audit.json](iris-t4-batching-audit.json).
+This is user-run GPU evidence, inspected locally rather than rerun on macOS.
+All seven source/config hashes match the measured checkout's files at inspection.
+
+Local recomputation from the archive's raw before/after `.prom` files matches
+all four reported per-node histogram deltas. Each cell completed ten H20
+requests, delivered 200 frames and 2,458,600 payload bytes, and ended complete
+and idle with no KV pages held. Each has exactly 3,420 world row-steps,
+200 decoder row-steps and ten encoder/initial-decoder row-steps.
+
+| Arm | Concurrency | World worker steps | One-row steps | Two-row steps | Mean rows/step |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Eager | 1 | 3,420 | 3,420 | 0 | 1.000 |
+| Eager | 2 | 1,915 | 410 | 1,505 | 1.786 |
+| Captured | 1 | 3,420 | 3,420 | 0 | 1.000 |
+| Captured | 2 | 3,420 | 3,420 | 0 | 1.000 |
+
+The logs contain 100 eager and 133 captured worker-phase records, matching the
+report. Captured startup lists all 78 requested buckets (72 world plus six
+image-node buckets). Both launch manifests specify the scoped SHM arena budget.
+Neither log contains arena-spill, error or traceback messages. No runtime
+failure was observed in this audit.
+
+Worker step width is not necessarily neural forward width. In
+`mstar/worker/worker_metrics.py`, `WorkerMetrics.step_done` records
+`len(inputs)`. The Engine can run an incompatible eager batch through
+`Engine._exec_per_request`, issuing one neural forward per row. Summing
+`step.world_model.imagine.engine.forward` samples in the eager phase log gives
+11,970 calls, equal to its final raw histogram's 11,970 row-steps across all
+35 requests (warmup included). This is consistent with its two-row worker
+steps being split into single-request forwards. The archive has no per-call
+row/key trace, so the precise incompatibility cause is not established.
+Do not present the 1,505 two-row steps as proof of batched neural execution.
+
+Captured B=2 **worker selection** remains unobserved for this workload. The
+separate direct-engine gate already demonstrated B=2 replay correctness, so
+this finding does not establish an inability to capture B=2. Its scheduling
+cause is not yet verified. Record the current behavior as a baseline before
+considering a scheduling change. The earlier zero-multirow qualification report
+also cannot be diagnosed retrospectively from this later run alone.
+
+These boots enabled `MSTAR_PHASE_TIMING=100`. Their latency/throughput fields
+are diagnostic and excluded from the final performance comparison. The phase
+segments mix node/step shapes; per-step means across arms also reflect different
+batching. Do not derive an uninstrumented speedup or a kernel-level cause from
+them. The next command uses `--stage timings` to retain the interleaved fresh
+process rounds while skipping this completed audit.
+
+SHA256 provenance:
+
+- Archive: `8fc3bd3aa95a4adcf02df868fa3b336fc83d0df96d79c17c279ad343f8ed5eed`.
+- Original report: `06e38e927554a5ee0f8f1bfd2bad0f39ba0d2d6b4710e792d523e16f39eccc2a`.
 
 Use [benchmark/iris/README.md](../../benchmark/iris/README.md) for the exact
 contracts, commands, parameters and interpretation, or

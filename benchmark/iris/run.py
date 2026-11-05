@@ -164,7 +164,7 @@ def run_cells(args, report, save):
     report["standalone"], report["http"] = [], []
     for round_index in range(args.rounds):
         # Reverse each successive round to expose ordering/load drift.
-        if args.stage in ("all", "standalone"):
+        if args.stage in ("all", "timings", "standalone"):
             order = ("official", "eager", "captured")
             for arm in order[:: 1 if round_index % 2 == 0 else -1]:
                 label = f"round-{round_index + 1}-standalone-{arm}"
@@ -191,11 +191,18 @@ def run_cells(args, report, save):
                     str(args.samples),
                 ]
                 with (args.output / f"{label}.log").open("w") as log:
-                    subprocess.run(command, cwd=ROOT, check=True, stdout=log, stderr=subprocess.STDOUT)
+                    subprocess.run(
+                        command,
+                        cwd=ROOT,
+                        check=True,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        env=dict(os.environ, MSTAR_PHASE_TIMING="0", OMP_NUM_THREADS="2"),
+                    )
                 report["standalone"].append({"round": round_index + 1, **json.loads(result_path.read_text())})
                 gpu_snapshot(args.output / f"{label}-gpu-after.csv")
                 save()
-        if args.stage in ("all", "http"):
+        if args.stage in ("all", "timings", "http"):
             for arm in ("eager", "captured")[:: 1 if round_index % 2 == 0 else -1]:
                 label = f"round-{round_index + 1}-http-{arm}"
                 report.setdefault("host_load", {})[label] = list(os.getloadavg())
@@ -220,7 +227,7 @@ def main(argv=None):
     parser.add_argument("--checkpoint", type=Path, default=Path(".ci-results/iris/Breakout.pt"))
     parser.add_argument("--reference-root", type=Path, default=Path(".ci-results/iris/reference"))
     parser.add_argument("--download-checkpoint", action="store_true")
-    parser.add_argument("--stage", choices=("all", "audit", "standalone", "http"), default="all")
+    parser.add_argument("--stage", choices=("all", "audit", "timings", "standalone", "http"), default="all")
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--requests", type=int, default=10)
     parser.add_argument("--samples", type=int, default=5)
