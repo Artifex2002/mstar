@@ -79,16 +79,28 @@ class LocalIrisEngine:
         )
 
     @torch.inference_mode()
-    def run(self, module, inputs, indices=None, draws=None):
+    def run(self, module, inputs, indices=None, draws=None, *, graph_walk=IMAGINE_WALK, input_metadata=None):
         rids = list(inputs)
         infos = {rid: self.info(rid, *(indices or {}).get(rid, (0, 0))) for rid in rids}
-        rows = [module.prepare_inputs(IMAGINE_WALK, infos[rid], inputs[rid]) for rid in rids]
+        for info in infos.values():
+            info.graph_walk = graph_walk
+        for rid, meta in (input_metadata or {}).items():
+            infos[rid].dynamic_loop_iter_counts = dict(meta.dynamic_loop_iter_counts)
+        rows = [
+            module.prepare_inputs(
+                graph_walk,
+                infos[rid],
+                inputs[rid],
+                **({"input_metadata": input_metadata[rid]} if input_metadata else {}),
+            )
+            for rid in rids
+        ]
         if any(row is None for row in rows):
             raise ValueError("diagnostic driver was asked to execute a speculative overshoot")
         if not module.can_batch(None, rows):
             raise ValueError("diagnostic batch is incompatible with the submodule")
-        step = module.declare_step(IMAGINE_WALK, rids, rows)
-        step.set_ctx(StepContext(tuple(rids), IMAGINE_WALK, 0, False))
+        step = module.declare_step(graph_walk, rids, rows)
+        step.set_ctx(StepContext(tuple(rids), graph_walk, 0, False))
         outcome = self.runner.admit(step)
         if not outcome.outcome.ok:
             raise RuntimeError(f"resource admission failed: {outcome}")
@@ -100,11 +112,11 @@ class LocalIrisEngine:
             for key, value in (draws or {}).items():
                 stack.enter_context(patch.object(self.resources[key], "sample", return_value=value))
             stack.enter_context(fp32_precision_scope(node_fp32_precision(type(module).__name__, module)))
-            prepared = module.preprocess(IMAGINE_WALK, engine, rows)
+            prepared = module.preprocess(graph_walk, engine, rows)
             if len(rids) == 1:
-                outputs = {rids[0]: module(IMAGINE_WALK, engine, **prepared)}
+                outputs = {rids[0]: module(graph_walk, engine, **prepared)}
             else:
-                outputs = module.forward_batched(IMAGINE_WALK, engine, **prepared)
+                outputs = module.forward_batched(graph_walk, engine, **prepared)
         self.runner.commit(step)
         return outputs
 

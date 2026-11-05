@@ -21,6 +21,10 @@ WORLD_MODEL = "world_model"
 IMAGE_DECODER = "image_decoder"
 INITIAL_DECODER = "initial_image_decoder"
 IMAGINE_WALK = "imagine"
+FRAME_DECODE_WALK = "decode_frames"
+DECODER_PARTITION = "frame_decoder"
+DECODE_LOOP = "frame_decode_loop"
+FRAME_STREAMS = ("frame_codes", "frame_reward_class", "frame_ending_class")
 ROLLOUT_LOOP = "rollout_loop"
 TOKEN_LOOP = "token_loop"
 WORLD_CARRY = ("observation_tokens", "reward_class", "ending_class")
@@ -43,6 +47,7 @@ class IrisConfig:
     max_rollout_horizon: int = 20
     max_batch_size: int = 2
     capture_graphs: bool = False
+    decoder_pipeline: bool = False
 
     def __post_init__(self):
         if self.game != "Breakout":
@@ -53,3 +58,7 @@ class IrisConfig:
             raise ValueError("max_batch_size must be an integer >= 1")
         if type(self.capture_graphs) is not bool:
             raise ValueError("capture_graphs must be a boolean")
+        if type(self.decoder_pipeline) is not bool:
+            raise ValueError("decoder_pipeline must be a boolean")
+        if self.decoder_pipeline and self.max_rollout_horizon > 20:
+            raise ValueError("the decoder pipeline experiment is bounded to at most 20 frames per request")

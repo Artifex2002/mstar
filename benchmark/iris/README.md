@@ -1,5 +1,11 @@
 # IRIS baseline benchmark
 
+For the optional serial-versus-async-decoder graph experiment, use
+[Step 5d](../../docs/design/iris-step-05d.md) and
+[decoder_pipeline_colab.ipynb](../../scripts/iris/decoder_pipeline_colab.ipynb).
+It requires fresh CUDA correctness gates before timing; its performance is
+unmeasured. The baseline below remains the control.
+
 This follows the [passed T4 correctness gates](../../docs/design/iris-step-05b.md#t4-qualification-evidence).
 The [T4 batching/phase audit](../../docs/design/iris-step-05c.md#t4-batching-audit-evidence)
 passed at `4b8db96e`: eager C=2 selected multirow worker steps; captured C=2 ran

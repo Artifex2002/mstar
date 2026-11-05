@@ -106,9 +106,10 @@ def closed_loop(url, concurrency, count, horizon, timeout=600):
 
 
 @contextmanager
-def server(checkpoint, output, captured, phase_period=0, port=8123):
+def server(checkpoint, output, captured, phase_period=0, port=8123, decoder_pipeline=False):
     output.mkdir(parents=True, exist_ok=False)
-    deployment = ROOT / "configs" / ("iris_capture.yaml" if captured else "iris.yaml")
+    name = "iris_capture" if captured else "iris"
+    deployment = ROOT / "configs" / f"{name}{'_pipeline' if decoder_pipeline else ''}.yaml"
     config = prepare_server_config(checkpoint, output, deployment)
     name = "iris-benchmark"
     env = dict(os.environ)

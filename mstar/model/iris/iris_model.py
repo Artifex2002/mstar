@@ -4,13 +4,18 @@ from mstar.communication.tensors import NameToTensorList
 from mstar.conductor.request_info import (
     DEFAULT_PARTITION,
     CurrentForwardConductorMetadata,
+    PartitionDefinition,
     StreamingConnectionState,
 )
 from mstar.engine.resources import KVReqConfig, NodeResourceSpec, ResourceReqConfig, SamplingReqConfig
 from mstar.graph.base import GraphEdge, GraphSection, TensorPointerInfo
 from mstar.model.base import ForwardPassArgs, KVLabel, Model, ProcessPromptOutput
 from mstar.model.iris.config import (
+    DECODE_LOOP,
+    DECODER_PARTITION,
     ENDING_SAMPLER,
+    FRAME_DECODE_WALK,
+    FRAME_STREAMS,
     HF_REPO,
     IMAGE_DECODER,
     IMAGE_ENCODER,
@@ -28,7 +33,7 @@ from mstar.model.iris.config import (
     WORLD_MODEL,
     IrisConfig,
 )
-from mstar.model.iris.graph import imagination_graph
+from mstar.model.iris.graph import frame_decoder_graph, imagination_graph
 from mstar.model.iris.resources import context_epochs, iris_resources, request_kv_layout
 from mstar.model.multimodal import PromptPart
 
@@ -51,12 +56,14 @@ class IrisModel(Model):
         checkpoint_path: str | None = None,
         max_batch_size: int = 2,
         capture_graphs: bool = False,
+        decoder_pipeline: bool = False,
     ):
         self.config = IrisConfig(
             game=game,
             max_rollout_horizon=max_rollout_horizon,
             max_batch_size=max_batch_size,
             capture_graphs=capture_graphs,
+            decoder_pipeline=decoder_pipeline,
         )
         self.model_path_hf = model_path_hf
         self.cache_dir = cache_dir
@@ -150,6 +157,22 @@ class IrisModel(Model):
         input_signals: dict[str, list[TensorPointerInfo]],
         model_kwargs: dict | None = None,
     ) -> ForwardPassArgs:
+        if self.config.decoder_pipeline and partition_name == DECODER_PARTITION:
+            self._validate_modalities(input_modalities, output_modalities)
+            horizon = self._horizon(model_kwargs)
+            metadata = CurrentForwardConductorMetadata(
+                graph_walk=FRAME_DECODE_WALK,
+                is_prefill=False,
+                input_modalities=list(input_modalities),
+                output_modalities=list(output_modalities),
+                kwargs={"iris_horizon": horizon},
+            )
+            return ForwardPassArgs(
+                full_metadata=metadata,
+                inputs=[],
+                unpersist_tensors=[],
+                step_metadata={"iris_horizon": horizon},
+            )
         if partition_name != DEFAULT_PARTITION:
             raise ValueError(f"Unknown IRIS partition: {partition_name!r}")
         self._validate_modalities(input_modalities, output_modalities)
@@ -184,6 +207,17 @@ class IrisModel(Model):
         persist_signals: dict[str, list[TensorPointerInfo]],
         incoming_connections: list[StreamingConnectionState] | None = None,
     ) -> ForwardPassArgs:
+        if self.config.decoder_pipeline and partition_name == DECODER_PARTITION:
+            if partition_metadata.graph_walk != FRAME_DECODE_WALK:
+                raise ValueError("IRIS frame decoder received an unknown walk")
+            # The bounded consuming Loop completes after H chunks. The worker
+            # owns stream termination; connection counters are not completion.
+            return ForwardPassArgs(
+                full_metadata=partition_metadata,
+                inputs=[],
+                unpersist_tensors=[],
+                request_done=True,
+            )
         if partition_name != DEFAULT_PARTITION or partition_metadata.graph_walk != IMAGINE_WALK:
             raise ValueError("IRIS can finish only its default partition's imagine walk")
         return ForwardPassArgs(
@@ -197,7 +231,10 @@ class IrisModel(Model):
         return self._horizon(model_kwargs)
 
     def get_loop_caps(self, **model_kwargs) -> dict[str, int]:
-        return {ROLLOUT_LOOP: self._horizon(model_kwargs), TOKEN_LOOP: TOKENS_PER_FRAME + 1}
+        caps = {ROLLOUT_LOOP: self._horizon(model_kwargs), TOKEN_LOOP: TOKENS_PER_FRAME + 1}
+        if self.config.decoder_pipeline:
+            caps[DECODE_LOOP] = self._horizon(model_kwargs)
+        return caps
 
     def request_kwargs(self) -> frozenset[str]:
         return frozenset({"actions"})
@@ -260,7 +297,37 @@ class IrisModel(Model):
         return configs
 
     def get_graph_walk_graphs(self) -> dict[str, GraphSection]:
-        return {IMAGINE_WALK: imagination_graph(self.config.max_rollout_horizon)}
+        walks = {IMAGINE_WALK: imagination_graph(self.config.max_rollout_horizon, self.config.decoder_pipeline)}
+        if self.config.decoder_pipeline:
+            walks[FRAME_DECODE_WALK] = frame_decoder_graph(self.config.max_rollout_horizon)
+        return walks
+
+    def get_partitions(self) -> list[PartitionDefinition]:
+        if not self.config.decoder_pipeline:
+            return super().get_partitions()
+        return [
+            PartitionDefinition(DEFAULT_PARTITION, {IMAGINE_WALK}, initial_walk=IMAGINE_WALK),
+            PartitionDefinition(
+                DECODER_PARTITION,
+                {FRAME_DECODE_WALK},
+                initial_walk=FRAME_DECODE_WALK,
+                producer_partitions=[DEFAULT_PARTITION],
+            ),
+        ]
+
+    def get_partition_topology(self):
+        if not self.config.decoder_pipeline:
+            return super().get_partition_topology()
+        from mstar.streaming.chunk_policy import FixedChunkPolicy
+        from mstar.streaming.topology import Connection, PartitionTopology
+
+        return PartitionTopology(
+            partitions=[DEFAULT_PARTITION, DECODER_PARTITION],
+            connections=[
+                Connection(DEFAULT_PARTITION, DECODER_PARTITION, name, lambda: FixedChunkPolicy(1))
+                for name in FRAME_STREAMS
+            ],
+        )
 
     def get_submodule(
         self,
@@ -276,7 +343,7 @@ class IrisModel(Model):
         if self.skip_weight_loading:
             return None
         from mstar.model.iris.checkpoint import load_networks, resolve_checkpoint
-        from mstar.model.iris.submodules import ImageSubmodule, WorldSubmodule
+        from mstar.model.iris.submodules import ImageSubmodule, StreamingImageSubmodule, WorldSubmodule
 
         if autocast_dtype not in (None, torch.float32):
             raise ValueError("IRIS's reference path requires FP32")
@@ -293,9 +360,15 @@ class IrisModel(Model):
                     self.config.max_rollout_horizon,
                     self.config.max_batch_size,
                     capture_graphs=self.config.capture_graphs,
+                    stream_frames=self.config.decoder_pipeline,
                 )
             else:
-                module = ImageSubmodule(
+                cls = (
+                    StreamingImageSubmodule
+                    if self.config.decoder_pipeline and node_name == IMAGE_DECODER
+                    else ImageSubmodule
+                )
+                module = cls(
                     networks.tokenizer,
                     decode=node_name != IMAGE_ENCODER,
                     initial=node_name == INITIAL_DECODER,

@@ -209,3 +209,9 @@ evidence, then compare official/eager/captured standalone rollouts and M* HTTP
 serving as separate scopes. The T4 audit and uninstrumented sweep passed;
 [the measured baseline](../../docs/design/iris-t4-benchmark.md) preserves rates,
 ranges and limits for official/eager/captured execution.
+
+The next optional graph-layout experiment is
+[Step 5d: async RGB decoding](../../docs/design/iris-step-05d.md). Start with
+[decoder_pipeline_colab.ipynb](decoder_pipeline_colab.ipynb) to qualify both
+pipeline servers against the serial implementation before any graph A/B.
+CUDA correctness and performance of this experimental layout are pending.

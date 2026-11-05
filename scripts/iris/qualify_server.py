@@ -228,7 +228,9 @@ def qualify(args, report, save):
     report["stage"] = "deployment_validation"
     save()
     config_path = prepare_server_config(args.checkpoint, args.output, args.config)
-    captured = yaml.safe_load(config_path.read_text())["model_kwargs"].get("capture_graphs", False)
+    model_kwargs = yaml.safe_load(config_path.read_text())["model_kwargs"]
+    captured = model_kwargs.get("capture_graphs", False)
+    report["decoder_pipeline"] = model_kwargs.get("decoder_pipeline", False)
     report["capture"] = "enabled; every declared bucket required" if captured else "disabled"
     if args.download_checkpoint:
         download_checkpoint(args.checkpoint)

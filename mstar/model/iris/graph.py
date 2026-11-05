@@ -6,6 +6,9 @@ from typing import Literal
 from mstar.graph.base import GraphEdge, GraphNode, GraphSection, Loop, Parallel, Sequential
 from mstar.graph.special_destinations import EMIT_TO_CLIENT
 from mstar.model.iris.config import (
+    DECODE_LOOP,
+    DECODER_PARTITION,
+    FRAME_STREAMS,
     FRAMES_PER_CONTEXT,
     IMAGE_DECODER,
     IMAGE_ENCODER,
@@ -56,7 +59,7 @@ def frame_calls(frame_index: int) -> tuple[WorldCall, ...]:
     )
 
 
-def imagination_graph(max_frames: int) -> GraphSection:
+def imagination_graph(max_frames: int, decoder_pipeline: bool = False) -> GraphSection:
     encode = GraphNode(
         name=IMAGE_ENCODER,
         input_names={"initial_image"},
@@ -93,14 +96,47 @@ def imagination_graph(max_frames: int) -> GraphSection:
             GraphEdge(next_node=EMIT_TO_CLIENT, name="ending", output_modality="tensor"),
         ],
     )
+    if decoder_pipeline:
+        from mstar.streaming.topology import StreamingGraphEdge
+
+        tokens.section.outputs.extend(
+            StreamingGraphEdge(next_node=IMAGE_DECODER, name=name, target_partition=DECODER_PARTITION)
+            for name in FRAME_STREAMS
+        )
+        tokens.outputs = [GraphEdge(next_node=WORLD_MODEL, name=name) for name in WORLD_CARRY]
     return Sequential(
         [
             encode,
             Parallel(
                 [
                     initial_decode,
-                    Loop(name=ROLLOUT_LOOP, max_iters=max_frames, section=Sequential([tokens, decode]), outputs=[]),
+                    Loop(
+                        name=ROLLOUT_LOOP,
+                        max_iters=max_frames,
+                        section=tokens if decoder_pipeline else Sequential([tokens, decode]),
+                        outputs=[],
+                    ),
                 ]
             ),
         ]
+    )
+
+
+def frame_decoder_graph(max_frames: int) -> GraphSection:
+    return Loop(
+        name=DECODE_LOOP,
+        max_iters=max_frames,
+        section=GraphNode(
+            name=IMAGE_DECODER,
+            input_names=set(FRAME_STREAMS),
+            consumes_stream=True,
+            outputs=[
+                GraphEdge(
+                    next_node=EMIT_TO_CLIENT, name="frames", output_modality="video_frame", conductor_new_token=True
+                ),
+                GraphEdge(next_node=EMIT_TO_CLIENT, name="reward", output_modality="scalar"),
+                GraphEdge(next_node=EMIT_TO_CLIENT, name="ending", output_modality="tensor"),
+            ],
+        ),
+        outputs=[],
     )

@@ -1376,7 +1376,11 @@ one encoder feeds a frame loop containing a world-model call loop and image
 decoding. A separate initial decode preserves the reference's reconstruction
 work without emitting an extra predicted frame. See ``docs/design/iris-step-03.md``
 and ``test/modular/test_iris_graph.py`` for its routing contract and native-runtime
-checks; neural execution is not implemented yet.
+checks. Neural execution and the serial graph's T4 serving baseline are now
+implemented; see ``docs/design/iris-t4-benchmark.md``. An opt-in alternative uses
+streaming edges into an independent decoder partition so the next world-model
+frame does not depend on RGB decoding. Its declaration, buffer-lifetime checks
+and pending CUDA experiment are in ``docs/design/iris-step-05d.md``.
 
 ``get_graph_walk_graphs`` returns one graph per walk. The primitives are defined in
 ``mstar/graph/base.py``:

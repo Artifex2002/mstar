@@ -6,9 +6,12 @@ from mstar.engine.accelerator_graph_config import BatchedAcceleratorGraphConfig,
 from mstar.engine.resources import AttentionStep, KVStep, PositionStep, SamplerStep, Segment, SubmoduleStep
 from mstar.model.iris.components import Tokenizer
 from mstar.model.iris.config import (
+    DECODE_LOOP,
     DECODER_ATTN,
     ENCODER_ATTN,
     ENDING_SAMPLER,
+    FRAME_DECODE_WALK,
+    FRAME_STREAMS,
     IMAGINE_WALK,
     OBSERVATION_SAMPLER,
     REWARD_SAMPLER,
@@ -20,7 +23,7 @@ from mstar.model.iris.config import (
     WORLD_POS,
 )
 from mstar.model.iris.graph import frame_calls
-from mstar.model.submodule_base import NodeInputs, NodeSubmodule
+from mstar.model.submodule_base import EMPTY_INPUT_METADATA, NodeInputs, NodeSubmodule, StopCheck
 
 
 class IrisSubmodule(NodeSubmodule):
@@ -58,6 +61,8 @@ class IrisSubmodule(NodeSubmodule):
 
 
 class ImageSubmodule(IrisSubmodule):
+    capture_walk = IMAGINE_WALK
+
     def __init__(self, tokenizer, decode=False, initial=False, max_batch_size=2, capture_graphs=False):
         super().__init__(max_batch_size, capture_graphs)
         self.decode, self.initial = decode, initial
@@ -83,7 +88,7 @@ class ImageSubmodule(IrisSubmodule):
             )
         return [
             BatchedAcceleratorGraphConfig(
-                IMAGINE_WALK,
+                self.capture_walk,
                 NodeInputs(tensor_inputs=tensors),
                 compile=False,
                 capture_batch_sizes=geometric_batch_sizes(self.batch_limit),
@@ -120,11 +125,29 @@ class ImageSubmodule(IrisSubmodule):
         }
 
 
+class StreamingImageSubmodule(ImageSubmodule):
+    capture_walk = FRAME_DECODE_WALK
+
+    def prepare_inputs(self, graph_walk, fwd_info, inputs, input_metadata=EMPTY_INPUT_METADATA, **kwargs):
+        frame = fwd_info.dynamic_loop_iter_counts.get(DECODE_LOOP, 0)
+        if frame >= fwd_info.step_metadata["iris_horizon"]:
+            return None
+        chunks = [input_metadata.stream_chunks.get(name) for name in FRAME_STREAMS]
+        if any(chunk is None for chunk in chunks):
+            raise ValueError("IRIS streamed decoding requires chunk metadata for every carrier")
+        if any(chunk.num_items != 1 or chunk.start_offset != frame for chunk in chunks):
+            raise ValueError("IRIS frame carrier streams are out of order or misaligned")
+        return NodeInputs(
+            tensor_inputs={name: inputs[stream][0] for name, stream in zip(WORLD_CARRY, FRAME_STREAMS, strict=True)}
+        )
+
+
 class WorldSubmodule(IrisSubmodule):
-    def __init__(self, network, max_horizon, max_batch_size=2, capture_graphs=False):
+    def __init__(self, network, max_horizon, max_batch_size=2, capture_graphs=False, stream_frames=False):
         super().__init__(max_batch_size, capture_graphs)
         self.network = network
         self.schedules = tuple(frame_calls(frame) for frame in range(max_horizon))
+        self.stream_frames = stream_frames
 
     def get_accelerator_graph_configs(self, device, tp_world_size=1):
         if not self.capture_graphs:
@@ -242,13 +265,18 @@ class WorldSubmodule(IrisSubmodule):
             observation_tokens[:, call.sample_index] = resources[OBSERVATION_SAMPLER].sample(
                 rids, result.logits_observations[:, 0]
             )
-        return {
+        outputs = {
             "observation_tokens": observation_tokens,
             "reward_class": reward_class,
             "ending_class": ending_class,
         }
+        if self.stream_frames and call.kind == "observation" and call.input_index == 15:
+            outputs.update({stream: outputs[name] for stream, name in zip(FRAME_STREAMS, WORLD_CARRY, strict=True)})
+        return outputs
 
     def check_stop(self, request_id, request_info, outputs):
         frame = request_info.dynamic_loop_iter_counts.get(ROLLOUT_LOOP, 0)
         token = request_info.dynamic_loop_iter_counts.get(TOKEN_LOOP, 0)
-        return {TOKEN_LOOP} if token + 1 == len(self.schedules[frame]) else set()
+        final = token + 1 == len(self.schedules[frame])
+        stops = {TOKEN_LOOP} if final else set()
+        return StopCheck(stops, withheld=FRAME_STREAMS if not final else ()) if self.stream_frames else stops

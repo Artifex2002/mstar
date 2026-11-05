@@ -1,0 +1,23 @@
+# Experimental async decoder partition; same GPU, weights and arithmetic as baseline.
+model: "iris"
+# Tokens per world-model context; the action horizon below may span contexts.
+max_seq_len: 340
+model_kwargs:
+  game: "Breakout"
+  max_rollout_horizon: 20
+  max_batch_size: 2
+  decoder_pipeline: true
+node_groups:
+  - node_names: [image_encoder, world_model, image_decoder, initial_image_decoder]
+    ranks: [0]
+resources:
+  world_kv:
+    page_size: 16
+    max_num_pages: 64
+    prefix_cache: false
+  world_attn:
+    backend: torch
+  encoder_attn:
+    backend: torch
+  decoder_attn:
+    backend: torch
