@@ -20,6 +20,14 @@ from scripts.iris.server_checks import StreamCheck, image_png, wait_idle
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVER_SCRIPT = ROOT / ".claude/skills/benchmarking/scripts/server.sh"
+# RGB64, H<=20 and two requests need small tensor transfers. Ceilings are per
+# entity: one GPU worker plus the API data worker can grow to 128 MiB total.
+ARENA_ENV = {
+    "MSTAR_SHM_ARENA": "1",
+    "MSTAR_SHM_ARENA_SEGMENT_MB": "16",
+    "MSTAR_SHM_ARENA_MAX_SEGMENTS": "4",
+    "MSTAR_SHM_ARENA_PIN_MAX_MB": "128",
+}
 
 
 @dataclass(frozen=True)
@@ -106,12 +114,12 @@ def server(checkpoint, output, captured, phase_period=0, port=8123):
     env = dict(os.environ)
     env.update(
         SERVER_STATE_DIR=str(output / "server-state"),
-        MSTAR_SHM_ARENA="1",
         MSTAR_PHASE_TIMING=str(phase_period),
         MSTAR_REQUIRE_ACCELERATOR_GRAPHS="1" if captured else "0",
         TORCHINDUCTOR_CACHE_DIR=str(output / "inductor"),
         OMP_NUM_THREADS="2",
     )
+    env.update(ARENA_ENV)
     env.pop("TRITON_CACHE_DIR", None)
     # Keep the versioned script responsible for listener ownership and teardown.
     start = [
@@ -147,8 +155,7 @@ def server(checkpoint, output, captured, phase_period=0, port=8123):
             {
                 "argv": start,
                 "env": {
-                    key: env[key]
-                    for key in ("MSTAR_SHM_ARENA", "MSTAR_PHASE_TIMING", "MSTAR_REQUIRE_ACCELERATOR_GRAPHS")
+                    key: env[key] for key in (*ARENA_ENV, "MSTAR_PHASE_TIMING", "MSTAR_REQUIRE_ACCELERATOR_GRAPHS")
                 },
             },
             indent=2,

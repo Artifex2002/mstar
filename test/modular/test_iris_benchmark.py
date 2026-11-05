@@ -6,6 +6,8 @@ import struct
 import time
 from pathlib import Path
 from threading import Lock
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -14,6 +16,70 @@ import torch
 
 from benchmark.iris import http
 from benchmark.iris.common import batching_delta, summarize, workload
+
+
+@pytest.mark.parametrize("captured", [False, True])
+def test_server_arena_budget_passes_real_colab_capacity_guard(tmp_path, monkeypatch, captured):
+    import triton.language as tl
+
+    if not hasattr(tl, "int64"):
+        monkeypatch.setattr(tl, "int64", int, raising=False)
+    native = pytest.importorskip("mstar_rust")
+    from mstar.communication import arena
+
+    class ArenaCreationReachedError(Exception):
+        pass
+
+    def create(name, segment_bytes, max_segments):
+        # Only construction up to the actual capacity guard is needed. Avoid
+        # allocating shared memory or starting transport threads on this host.
+        assert segment_bytes == 16 << 20 and max_segments == 4
+        raise ArenaCreationReachedError
+
+    monkeypatch.setattr(native, "SegmentedShmArena", SimpleNamespace(create=create))
+    monkeypatch.setattr(arena.SharedMemoryCommunicationManager, "__init__", lambda *args, **kwargs: None)
+    monkeypatch.setattr(arena, "HostCopier", lambda *args: None)
+    monkeypatch.setattr(arena.ArenaShmCommunicationManager, "_sweep_orphans", lambda self: None)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    statvfs = arena.os.statvfs
+    monkeypatch.setattr(
+        arena.os,
+        "statvfs",
+        lambda path: (
+            SimpleNamespace(f_frsize=1 << 20, f_blocks=5752, f_bavail=5752) if path == "/dev/shm" else statvfs(path)
+        ),
+    )
+
+    def construct(env):
+        manager = arena.ArenaShmCommunicationManager.__new__(arena.ArenaShmCommunicationManager)
+        manager._shm_namespace = None
+        with patch.dict(arena.os.environ, env):
+            manager.__init__("iris-test", "localhost", "cpu", None)
+
+    # Reproduce the reported failure through the real constructor's guard.
+    with pytest.raises(RuntimeError, match="8192 MiB.*exceeds /dev/shm"):
+        construct({"MSTAR_SHM_ARENA_SEGMENT_MB": "256", "MSTAR_SHM_ARENA_MAX_SEGMENTS": "32"})
+    monkeypatch.setenv("MSTAR_SHM_ARENA_SEGMENT_MB", "256")
+    calls = []
+
+    def launch(command, *, env, **kwargs):
+        calls.append(command[2])
+        if command[2] == "start":
+            with pytest.raises(ArenaCreationReachedError):
+                construct(env)
+            pid = Path(env["SERVER_STATE_DIR"]) / "iris-benchmark.pid"
+            pid.parent.mkdir(parents=True)
+            pid.write_text("123")
+        assert all(env[key] == value for key, value in http.ARENA_ENV.items())
+
+    monkeypatch.setattr(http.subprocess, "run", launch)
+    output = tmp_path / "server"
+    with http.server(tmp_path / "Breakout.pt", output, captured, phase_period=100) as url:
+        assert url == "http://127.0.0.1:8123"
+    assert calls == ["start", "stop"]
+    manifest = json.loads((output / "launch.json").read_text())
+    assert {key: manifest["env"][key] for key in http.ARENA_ENV} == http.ARENA_ENV
+    assert arena.os.environ["MSTAR_SHM_ARENA_SEGMENT_MB"] == "256"  # parent was not changed
 
 
 def histogram(count, singles, rows, component="world_model"):

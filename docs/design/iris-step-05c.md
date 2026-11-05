@@ -10,6 +10,18 @@ Local validation on macOS with `OMP_NUM_THREADS=2`: 83 focused tests passed
 along with 15 CPU-selection checks. Ruff, diff checks and notebook shell/Python
 syntax checks passed. This is not a CUDA benchmark result.
 
+The first Colab audit reached eager server startup, then the arena capacity
+guard rejected its default 8 GiB per-entity ceiling against 5,752 MiB tmpfs.
+The benchmark launcher now supplies 16 MiB segments and a four-segment cap
+(64 MiB per entity), with a 128 MiB pin budget, for both arms. It records those
+values in `launch.json` and leaves M*'s global defaults alone. A CPU regression
+calls the real arena constructor with reported Colab capacity: the old defaults
+raise the original error, while both benchmark launch paths pass that guard and
+reach native arena creation (intercepted before allocation). Full GPU startup,
+batching evidence and timings still require the rerun.
+For this correction, all 85 focused CPU checks pass, including the eager and
+captured launcher regressions; Ruff and diff checks pass too.
+
 Use [benchmark/iris/README.md](../../benchmark/iris/README.md) for the exact
 contracts, commands, parameters and interpretation, or
 [benchmark_colab.ipynb](../../scripts/iris/benchmark_colab.ipynb) for setup and

@@ -62,8 +62,8 @@ if ! command -v ss >/dev/null 2>&1; then
 fi
 mkdir -p .ci-results/iris
 OMP_NUM_THREADS=2 python -m benchmark.iris.run --stage audit \
-  --download-checkpoint --output .ci-results/iris/benchmark-audit-01 \
-  2>&1 | tee .ci-results/iris/benchmark-audit-01.log
+  --download-checkpoint --output .ci-results/iris/benchmark-audit-02 \
+  2>&1 | tee .ci-results/iris/benchmark-audit-02.log
 ```
 
 Send the audit directory and log first, especially if it reports a missing or
@@ -120,7 +120,18 @@ See [worker_phases/README.md](../worker_phases/README.md).
 
 Timed HTTP boots set `MSTAR_PHASE_TIMING=0`, use the versioned benchmarking
 `server.sh` for ownership-checked startup/teardown, and explicitly use
-`MSTAR_SHM_ARENA=1`. Captured boots require every declared graph bucket and
+`MSTAR_SHM_ARENA=1`. This RGB64, two-request workload uses 16 MiB segments with
+a four-segment cap: 64 MiB per entity, or 128 MiB across the single GPU worker
+and API data worker. The pin budget is 128 MiB per entity to cover own and peer
+segments. These settings apply equally to audit and timed eager/captured boots
+and are recorded in each `launch.json`; M*'s global defaults are unchanged.
+The first Colab audit stopped before serving because the default 8 GiB
+per-entity ceiling exceeded its 5,752 MiB `/dev/shm`. Update the branch and
+retry into a new directory (for example `benchmark-audit-02`); a Rust rebuild
+is not needed for this launcher-only correction. Ordinary in-flight payloads
+are small (one RGB24 frame is 12 KiB, one FP32 input image 48 KiB). The rerun
+must still establish that the complete workload fits and does not spill.
+Captured boots require every declared graph bucket and
 standalone captured steps require a replay lease. The engine's leased-forward
 path calls `AcceleratorGraphRunner.run_forward`; no diagnostic wrapper is timed.
 Check per-arm logs for unexpected fallback/errors before accepting a comparison.
