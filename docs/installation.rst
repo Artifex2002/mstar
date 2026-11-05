@@ -62,8 +62,8 @@ reference requirements for regenerating official CUDA traces. Setup and GPU
 acceptance commands are in ``scripts/iris/CAPTURE.md`` and
 ``scripts/iris/qualify_capture_colab.ipynb``. FP32 capture/replay and captured
 full-server correctness passed on T4 at ``2ea19ee4``; see
-``docs/design/iris-step-05b.md`` for evidence and limits. Performance remains
-unmeasured.
+``docs/design/iris-step-05b.md`` for evidence and limits. The initial T4
+standalone/HTTP timing baseline is recorded in ``docs/design/iris-t4-benchmark.md``.
 
 The IRIS baseline benchmark uses that same Python environment and the versioned
 benchmarking server launcher. It additionally needs Linux ``ss``, ``setsid``,

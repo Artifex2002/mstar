@@ -3,8 +3,10 @@
 This follows the [capture correctness gates](iris-step-05b.md#t4-qualification-evidence).
 **The batching/phase audit passed on Tesla T4 at clean commit `4b8db96e`.**
 Eager multirow worker selection was observed; captured serving used single rows in this
-run. Standalone GPU benchmark validation and the uninstrumented performance
-sweep remain pending. Retain raw metrics even if an audit fails.
+run. **The standalone GPU and uninstrumented three-round timing sweep passed
+at `b16393e6`**; see [the baseline results](iris-t4-benchmark.md) for measured
+rates, variability, scope and independent checks. This completes the initial
+baseline experiment. Retain raw metrics even if an audit fails.
 
 Local validation on macOS with `OMP_NUM_THREADS=2`: 83 focused tests passed
 (18 benchmark tests plus IRIS capture/server and worker-phase regressions),
@@ -19,7 +21,8 @@ values in `launch.json` and leaves M*'s global defaults alone. A CPU regression
 calls the real arena constructor with reported Colab capacity: the old defaults
 raise the original error, while both benchmark launch paths pass that guard and
 reach native arena creation (intercepted before allocation). The subsequent
-GPU startup and audit passed as recorded below; final timings are still pending.
+GPU startup and audit passed as recorded below, followed by the timing sweep
+linked above.
 For this correction, all 85 focused CPU checks pass, including the eager and
 captured launcher regressions; Ruff and diff checks pass too.
 

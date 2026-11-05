@@ -199,11 +199,13 @@ checks remain required before benchmarking. `configs/iris.yaml` opts into the
 eager `torch` attention backends. The later [Step 5b lesson](../../docs/design/iris-step-05b.md)
 records passed eager/captured qualification on T4 and the limits of the batching
 evidence. Use [CAPTURE.md](CAPTURE.md) for the separate captured configuration.
-Performance remains unmeasured. See [the Step 4 lesson](../../docs/design/iris-step-04.md)
+See [the measured T4 baseline](../../docs/design/iris-t4-benchmark.md) for performance
+and [the Step 4 lesson](../../docs/design/iris-step-04.md)
 for the original eager implementation.
 
 For the next experiment, use the [baseline benchmark](../../benchmark/iris/README.md)
 and [Step 5c lesson](../../docs/design/iris-step-05c.md). Start with worker batching
 evidence, then compare official/eager/captured standalone rollouts and M* HTTP
-serving as separate scopes. The T4 batching audit passed; standalone GPU
-validation and the uninstrumented performance sweep remain pending.
+serving as separate scopes. The T4 audit and uninstrumented sweep passed;
+[the measured baseline](../../docs/design/iris-t4-benchmark.md) preserves rates,
+ranges and limits for official/eager/captured execution.

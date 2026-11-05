@@ -26,10 +26,12 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
        ``docs/design/iris-t4-server-qualification.json``. FP32 capture/replay and
        captured full-server correctness passed on T4 at ``2ea19ee4``; see
        ``docs/design/iris-step-05b.md`` for evidence and limits, including server
-       multirow batching not established by that run. Performance is unmeasured.
+       multirow batching not established by that run. The initial FP32 T4
+       performance baseline at ``b16393e6`` is recorded with scope and ranges
+       in ``docs/design/iris-t4-benchmark.md``.
        Capture setup: ``scripts/iris/CAPTURE.md``.
        Baseline benchmark and batching audit: ``benchmark/iris/README.md``
-       (T4 audit passed; standalone GPU and final timing validation pending).
+       (T4 audit and standalone/HTTP timing sweeps passed).
    * - ``chatterbox`` / ``chatterbox_multilingual`` / ``chatterbox_turbo``
      - ``ResembleAI/chatterbox``, ``ResembleAI/chatterbox-turbo``
      - Zero-shot voice-cloning TTS: T3 speech-token LM (Llama-520M, or GPT-2-medium

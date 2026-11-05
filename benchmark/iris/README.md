@@ -3,9 +3,12 @@
 This follows the [passed T4 correctness gates](../../docs/design/iris-step-05b.md#t4-qualification-evidence).
 The [T4 batching/phase audit](../../docs/design/iris-step-05c.md#t4-batching-audit-evidence)
 passed at `4b8db96e`: eager C=2 selected multirow worker steps; captured C=2 ran
-single-row steps. **Standalone GPU benchmark validation and uninstrumented
-performance results remain pending**. Do not infer a speedup from successful capture or from qualification
-wall times. Run on one otherwise idle Linux NVIDIA allocation, using the same
+single-row steps. **The uninstrumented three-round sweep passed on T4 at
+`b16393e6`**; see the [baseline results and ranges](../../docs/design/iris-t4-benchmark.md).
+H20 standalone captured/official median throughput ratios are 5.23x at B=1 and
+5.98x at B=2; HTTP captured/eager ratios are 4.31x at C=1 and 4.03x at C=2.
+These compare the configured pipelines on this workload, not an isolated
+capture mechanism. Run on one otherwise idle Linux NVIDIA allocation, using the same
 GPU and checkout for every arm. Stop the qualification servers first.
 
 ## What is compared

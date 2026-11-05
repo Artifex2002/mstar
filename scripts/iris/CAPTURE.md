@@ -7,8 +7,9 @@ correctness passed on Tesla T4 at clean commit `2ea19ee4`**, using PyTorch
 2.12.1+cu132. See the [direct report](../../docs/design/iris-t4-capture-qualification.json),
 [server report](../../docs/design/iris-t4-capture-server-qualification.json) and
 [evidence notes](../../docs/design/iris-step-05b.md#t4-qualification-evidence).
-Server multirow batching was not established by that run, and performance is
-unmeasured. `configs/iris.yaml` remains the eager configuration.
+Server multirow batching was not established by that run. The subsequent
+[T4 timing baseline](../../docs/design/iris-t4-benchmark.md) records measured
+performance and its scope. `configs/iris.yaml` remains the eager configuration.
 
 Use [qualify_capture_colab.ipynb](qualify_capture_colab.ipynb) on a Linux NVIDIA
 GPU. The notebook can prepare a fresh checkout/environment or reuse the previous
@@ -122,7 +123,8 @@ sampling repeatability answer different questions; report both. Failures retain
 frame/tick/request context and numerical difference details. These checks do not
 replace statistical sampler tests or benchmark output-quality evaluation.
 
-The next gate is a controlled benchmark under `benchmark/`: official PyTorch,
-M* eager, and validated M* captured execution, with matching workloads, warmup,
-repeated runs and worker-phase evidence. Measure before claiming a benefit from
-capture or attempting further kernel/compilation tuning.
+The subsequent controlled benchmark under `benchmark/iris/` compares official
+PyTorch, M* eager and M* captured execution with matching workloads, warmup,
+repeated runs and worker-phase evidence. Its [T4 results](../../docs/design/iris-t4-benchmark.md)
+compare configured pipelines; they do not isolate capture from attention and
+sampler differences. Retain that baseline before further tuning.
