@@ -49,6 +49,7 @@ DEFAULT_CONFIGS: dict[str, str] = {
     "qwen3_tts_voicedesign": "qwen3tts_voicedesign.yaml",
     "qwen3_tts_base": "qwen3tts_base.yaml",
     "fish_s2_pro": "fish_s2_pro.yaml",
+    "iris": "iris.yaml",
     "pi05": "pi05.yaml",
     "vjepa2": "vjepa2.yaml",
     "vjepa2_ac": "vjepa2_ac.yaml",

@@ -59,6 +59,9 @@ Registry keys live in ``mstar/model/registry.py`` (``MODEL_REGISTRY`` / ``HF_MOD
    * - ``dreamerv3`` *(Development scaffold)*
      - Not selected
      - Frozen DreamerV3 policy integration under development; inference is not implemented yet.
+   * - ``iris`` *(Development scaffold)*
+     - ``eloialonso/iris`` (``pretrained_models/Breakout.pt``)
+     - IRIS Transformer world-model integration under development; inference is not implemented yet.
    * - ``kokoro``
      - ``hexgrad/Kokoro-82M``
      - TTS (82M, not autoregressive): misaki G2P + PL-BERT prosody + iSTFTNet
