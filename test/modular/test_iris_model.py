@@ -11,9 +11,6 @@ from mstar.model.multimodal import PromptPart
 class RequestOnlyIRIS(IRISModel):
     """Expose the real preprocessing methods while execution remains abstract."""
 
-    def get_node_resources(self):
-        raise NotImplementedError
-
     def get_graph_walk_graphs(self):
         raise NotImplementedError
 
@@ -173,3 +170,47 @@ def test_invalid_conductor_horizon(model, horizon):
 def test_action_descriptor_must_match_horizon(model):
     with pytest.raises(ValueError):
         initial_args(model, horizon=2)
+
+
+def test_resource_ownership_and_dependencies(model):
+    specs = model.get_node_resources()
+    by_key = {spec.resource_key: spec for spec in specs}
+
+    assert len(specs) == len(by_key) == 8
+    for key in (
+        "world_kv",
+        "world_attn",
+        "world_pos",
+        "observation_sampler",
+        "reward_sampler",
+        "ending_sampler",
+    ):
+        assert by_key[key].nodes == {"world_model"}
+
+    assert by_key["encoder_attn"].nodes == {"image_encoder"}
+    assert by_key["decoder_attn"].nodes == {"image_decoder"}
+    assert by_key["world_attn"].depends_on() == {"world_kv"}
+    assert by_key["world_pos"].depends_on() == {"world_kv"}
+
+
+def test_resource_geometry(model):
+    by_key = {spec.resource_key: spec for spec in model.get_node_resources()}
+    kv = by_key["world_kv"].config
+    assert (
+        kv.num_layers,
+        kv.num_kv_heads,
+        kv.num_qo_heads,
+        kv.head_dim,
+        kv.max_seq_len,
+    ) == (10, 4, 4, 64, 340)
+    assert not kv.prefix_cache
+
+    assert by_key["observation_sampler"].vocab_size == 512
+    assert by_key["reward_sampler"].vocab_size == 3
+    assert by_key["ending_sampler"].vocab_size == 2
+    for key in ("encoder_attn", "decoder_attn"):
+        config = by_key[key].config
+        assert config.num_qo_heads == config.num_kv_heads == 1
+        assert config.head_dim == 64
+        assert config.max_tokens_per_request == 256
+        assert config.dtype == torch.float32

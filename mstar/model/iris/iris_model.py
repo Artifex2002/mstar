@@ -6,9 +6,11 @@ from mstar.conductor.request_info import (
     CurrentForwardConductorMetadata,
     StreamingConnectionState,
 )
+from mstar.engine.resources import NodeResourceSpec
 from mstar.graph.base import GraphEdge, TensorPointerInfo
 from mstar.model.base import ForwardPassArgs, Model, ProcessPromptOutput
 from mstar.model.iris.config import HF_REPO, IMAGE_SHAPE, IRISConfig
+from mstar.model.iris.resources import iris_resources
 from mstar.model.multimodal import PromptPart
 from mstar.utils.generation_kwargs import check_seed
 
@@ -230,3 +232,6 @@ class IRISModel(Model):
 
     def get_loop_caps(self, **model_kwargs) -> dict[str, int]:
         return {"rollout_loop": self._horizon(model_kwargs)}
+
+    def get_node_resources(self) -> list[NodeResourceSpec]:
+        return iris_resources()
