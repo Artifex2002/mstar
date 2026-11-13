@@ -3,6 +3,7 @@
 import pytest
 import torch
 
+from mstar.graph.base import TensorPointerInfo
 from mstar.model.iris.iris_model import IRISModel
 from mstar.model.multimodal import PromptPart
 
@@ -14,12 +15,6 @@ class RequestOnlyIRIS(IRISModel):
         raise NotImplementedError
 
     def get_graph_walk_graphs(self):
-        raise NotImplementedError
-
-    def get_initial_forward_pass_args(self, *args, **kwargs):
-        raise NotImplementedError
-
-    def get_partition_forward_pass_args(self, *args, **kwargs):
         raise NotImplementedError
 
     def get_submodule(self, *args, **kwargs):
@@ -120,3 +115,61 @@ def test_request_contract_flags(model):
 
 def test_shorter_request(model):
     assert prepare(model, actions=[0]).metadata == {"iris_horizon": 1}
+
+
+def descriptor(tensor, identity):
+    return TensorPointerInfo(
+        dims=list(tensor.shape),
+        dtype=tensor.dtype,
+        nbytes=tensor.numel() * tensor.element_size(),
+        address=0,
+        stride=list(tensor.stride()),
+        uuid=identity,
+        source_session_id="test",
+        source_entity="api_server",
+    )
+
+
+def initial_args(model, horizon=3):
+    signals = {
+        "initial_image": [descriptor(torch.zeros(3, 64, 64), 1)],
+        "actions": [descriptor(torch.zeros(3, dtype=torch.int64), 2)],
+    }
+    return model.get_initial_forward_pass_args(
+        partition_name="default",
+        input_modalities=["image"],
+        output_modalities=["video_frame", "scalar", "tensor"],
+        input_signals=signals,
+        model_kwargs={"iris_horizon": horizon},
+    )
+
+
+def test_initial_routing_and_completion(model):
+    args = initial_args(model)
+    assert args.full_metadata.graph_walk == "imagine"
+    assert not args.request_done
+    assert args.step_metadata == {"iris_horizon": 3}
+    assert [(edge.name, edge.next_node) for edge in args.inputs] == [
+        ("initial_image", "image_encoder"),
+        ("actions", "world_model"),
+    ]
+    assert len(args.unpersist_tensors) == 2
+
+    done = model.get_partition_forward_pass_args(
+        "default", args.full_metadata, {}
+    )
+    assert done.request_done
+    assert done.inputs == []
+    assert model.get_max_output_tokens(iris_horizon=3) == 3
+    assert model.get_loop_caps(iris_horizon=3) == {"rollout_loop": 3}
+
+
+@pytest.mark.parametrize("horizon", [None, True, 0, 4])
+def test_invalid_conductor_horizon(model, horizon):
+    with pytest.raises(ValueError):
+        initial_args(model, horizon)
+
+
+def test_action_descriptor_must_match_horizon(model):
+    with pytest.raises(ValueError):
+        initial_args(model, horizon=2)

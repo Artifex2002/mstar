@@ -1,7 +1,13 @@
 import torch
 
 from mstar.communication.tensors import NameToTensorList
-from mstar.model.base import Model, ProcessPromptOutput
+from mstar.conductor.request_info import (
+    DEFAULT_PARTITION,
+    CurrentForwardConductorMetadata,
+    StreamingConnectionState,
+)
+from mstar.graph.base import GraphEdge, TensorPointerInfo
+from mstar.model.base import ForwardPassArgs, Model, ProcessPromptOutput
 from mstar.model.iris.config import HF_REPO, IMAGE_SHAPE, IRISConfig
 from mstar.model.multimodal import PromptPart
 from mstar.utils.generation_kwargs import check_seed
@@ -122,3 +128,105 @@ class IRISModel(Model):
             },
             metadata={"iris_horizon": horizon},
         )
+
+    def _horizon(self, model_kwargs: dict | None) -> int:
+        horizon = (model_kwargs or {}).get("iris_horizon")
+        if (
+            type(horizon) is not int
+            or not 1 <= horizon <= self.config.max_rollout_horizon
+        ):
+            raise ValueError(
+                "IRIS requires a validated iris_horizon from process_prompt."
+            )
+        return horizon
+
+    def get_initial_forward_pass_args(
+        self,
+        partition_name: str,
+        input_modalities: list[str],
+        output_modalities: list[str],
+        input_signals: dict[str, list[TensorPointerInfo]],
+        model_kwargs: dict | None = None,
+    ) -> ForwardPassArgs:
+        if partition_name != DEFAULT_PARTITION:
+            raise ValueError(f"Unknown IRIS partition: {partition_name!r}")
+
+        if input_modalities != ["image"]:
+            raise ValueError("IRIS requires exactly one image input.")
+
+        if output_modalities != ["video_frame", "scalar", "tensor"]:
+            raise ValueError(
+                "IRIS requires output_modalities="
+                "['video_frame', 'scalar', 'tensor']."
+            )
+
+        horizon = self._horizon(model_kwargs)
+        inputs = []
+
+        for name, node, shape, dtype in (
+            ("initial_image", "image_encoder", IMAGE_SHAPE, torch.float32),
+            ("actions", "world_model", (horizon,), torch.int64),
+        ):
+            infos = input_signals.get(name, [])
+            if (
+                len(infos) != 1
+                or tuple(infos[0].dims) != shape
+                or infos[0].dtype != dtype
+            ):
+                raise ValueError(
+                    f"IRIS {name} requires one {dtype} descriptor "
+                    f"shaped {shape}."
+                )
+
+            inputs.append(
+                GraphEdge(
+                    next_node=node,
+                    name=name,
+                    tensor_info=list(infos),
+                )
+            )
+
+        metadata = CurrentForwardConductorMetadata(
+            graph_walk="imagine",
+            is_prefill=True,
+            input_modalities=list(input_modalities),
+            output_modalities=list(output_modalities),
+            kwargs={"iris_horizon": horizon},
+        )
+
+        return ForwardPassArgs(
+            full_metadata=metadata,
+            inputs=inputs,
+            unpersist_tensors=[
+                info for edge in inputs for info in edge.tensor_info
+            ],
+            step_metadata={"iris_horizon": horizon},
+        )
+
+    def get_partition_forward_pass_args(
+        self,
+        partition_name: str,
+        partition_metadata: CurrentForwardConductorMetadata,
+        persist_signals: dict[str, list[TensorPointerInfo]],
+        incoming_connections: list[StreamingConnectionState] | None = None,
+    ) -> ForwardPassArgs:
+        if (
+            partition_name != DEFAULT_PARTITION
+            or partition_metadata.graph_walk != "imagine"
+        ):
+            raise ValueError(
+                "IRIS can finish only its default partition's imagine walk."
+            )
+
+        return ForwardPassArgs(
+            full_metadata=partition_metadata,
+            inputs=[],
+            unpersist_tensors=[],
+            request_done=True,
+        )
+
+    def get_max_output_tokens(self, **model_kwargs) -> int:
+        return self._horizon(model_kwargs)
+
+    def get_loop_caps(self, **model_kwargs) -> dict[str, int]:
+        return {"rollout_loop": self._horizon(model_kwargs)}
