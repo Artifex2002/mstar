@@ -6,11 +6,20 @@ from mstar.conductor.request_info import (
     CurrentForwardConductorMetadata,
     StreamingConnectionState,
 )
-from mstar.engine.resources import NodeResourceSpec
+from mstar.engine.resources import (
+    KVReqConfig,
+    NodeResourceSpec,
+    ResourceReqConfig,
+    SamplingReqConfig,
+)
 from mstar.graph.base import GraphEdge, TensorPointerInfo
-from mstar.model.base import ForwardPassArgs, Model, ProcessPromptOutput
+from mstar.model.base import ForwardPassArgs, KVLabel, Model, ProcessPromptOutput
 from mstar.model.iris.config import HF_REPO, IMAGE_SHAPE, IRISConfig
-from mstar.model.iris.resources import iris_resources
+from mstar.model.iris.resources import (
+    context_epochs,
+    iris_resources,
+    request_kv_layout,
+)
 from mstar.model.multimodal import PromptPart
 from mstar.utils.generation_kwargs import check_seed
 
@@ -128,7 +137,10 @@ class IRISModel(Model):
                 "initial_image": [image.contiguous()],
                 "actions": [action_tensor],
             },
-            metadata={"iris_horizon": horizon},
+            metadata={
+                "iris_horizon": horizon,
+                "kv_layout": request_kv_layout(horizon),
+            },
         )
 
     def _horizon(self, model_kwargs: dict | None) -> int:
@@ -235,3 +247,43 @@ class IRISModel(Model):
 
     def get_node_resources(self) -> list[NodeResourceSpec]:
         return iris_resources()
+
+    def kv_labels(self) -> dict[str, dict[str, KVLabel]]:
+        return {
+            "world_kv": {
+                epoch.label: KVLabel()
+                for epoch in context_epochs(self.config.max_rollout_horizon)
+            }
+        }
+
+    def get_request_resource_configs(
+        self,
+        partition_fwd_args: dict[str, ForwardPassArgs],
+        model_kwargs: dict | None = None,
+    ) -> dict[str, ResourceReqConfig]:
+        horizon = self._horizon(model_kwargs)
+        configs: dict[str, ResourceReqConfig] = {
+            "world_kv": KVReqConfig(
+                needed_labels=[
+                    epoch.label for epoch in context_epochs(horizon)
+                ],
+                prefix_cache=False,
+            )
+        }
+
+        for key in (
+            "observation_sampler",
+            "reward_sampler",
+            "ending_sampler",
+        ):
+            configs[key] = SamplingReqConfig(
+                temperature=1.0,
+                top_k=0,
+                top_p=1.0,
+                min_p=0.0,
+                repetition_penalty=1.0,
+                ignore_eos=True,
+                penalize_prompt=False,
+            )
+
+        return configs

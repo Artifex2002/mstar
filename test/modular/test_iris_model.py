@@ -1,10 +1,15 @@
 """CPU request validation without constructing IRIS compute or resources."""
 
+from pathlib import Path
+
 import pytest
 import torch
+import yaml
 
+from mstar.engine.resources import apply_yaml_overrides, resolve_spec_dependencies
 from mstar.graph.base import TensorPointerInfo
 from mstar.model.iris.iris_model import IRISModel
+from mstar.model.iris.resources import context_epochs, request_kv_layout
 from mstar.model.multimodal import PromptPart
 
 
@@ -43,7 +48,7 @@ def test_prepared_request_and_derived_horizon(model):
         iris_horizon=999,
         prompt_parts=[PromptPart(modality="image", index=0)],
     )
-    assert result.metadata == {"iris_horizon": 3}
+    assert result.metadata["iris_horizon"] == 3
     assert result.new_input_tensors["image_inputs"] == []
     prepared_image = result.new_input_tensors["initial_image"][0]
     assert prepared_image.is_contiguous()
@@ -111,7 +116,7 @@ def test_request_contract_flags(model):
 
 
 def test_shorter_request(model):
-    assert prepare(model, actions=[0]).metadata == {"iris_horizon": 1}
+    assert prepare(model, actions=[0]).metadata["iris_horizon"] == 1
 
 
 def descriptor(tensor, identity):
@@ -214,3 +219,96 @@ def test_resource_geometry(model):
         assert config.head_dim == 64
         assert config.max_tokens_per_request == 256
         assert config.dtype == torch.float32
+
+
+@pytest.mark.parametrize(
+    ("horizon", "tokens"),
+    [
+        (1, [33]),
+        (19, [339]),
+        (20, [339, 33]),
+        (38, [339, 339]),
+        (39, [339, 339, 33]),
+    ],
+)
+def test_context_footprints(horizon, tokens):
+    epochs = context_epochs(horizon)
+    assert [epoch.tokens for epoch in epochs] == tokens
+    assert [epoch.label for epoch in epochs] == [
+        f"epoch_{index}" for index in range(len(tokens))
+    ]
+    assert sum(epoch.frames for epoch in epochs) == horizon
+    assert all(epoch.tokens <= 340 for epoch in epochs)
+
+    layouts = request_kv_layout(horizon)["world_kv"]
+    assert [layout.spans[0].length for layout in layouts.values()] == tokens
+    assert all(layout.growth == () for layout in layouts.values())
+
+
+@pytest.mark.parametrize("horizon", [None, True, 0, -1, 1.5, "20"])
+def test_invalid_context_horizon(horizon):
+    with pytest.raises(ValueError):
+        context_epochs(horizon)
+
+
+def test_preprocessing_returns_kv_layout(model):
+    result = prepare(model)
+    layout = result.metadata["kv_layout"]["world_kv"]["epoch_0"]
+    assert layout.spans[0].length == 67
+    assert layout.row()
+
+
+def test_request_resource_settings():
+    model = RequestOnlyIRIS(max_rollout_horizon=20)
+    assert set(model.kv_labels()["world_kv"]) == {"epoch_0", "epoch_1"}
+
+    configs = model.get_request_resource_configs({}, {"iris_horizon": 20})
+    assert configs["world_kv"].needed_labels == ["epoch_0", "epoch_1"]
+    assert not configs["world_kv"].prefix_cache
+    shorter = model.get_request_resource_configs({}, {"iris_horizon": 1})
+    assert shorter["world_kv"].needed_labels == ["epoch_0"]
+
+    for key in ("observation_sampler", "reward_sampler", "ending_sampler"):
+        config = configs[key]
+        assert config.temperature == 1.0
+        assert config.top_k == 0
+        assert config.top_p == 1.0
+        assert config.min_p == 0.0
+        assert config.repetition_penalty == 1.0
+        assert config.ignore_eos
+        assert not config.penalize_prompt
+        config.validate()
+
+
+def configured_specs(model):
+    specs = model.get_node_resources()
+    path = Path(__file__).resolve().parents[2] / "configs/iris.yaml"
+    apply_yaml_overrides(specs, yaml.safe_load(path.read_text()))
+    return resolve_spec_dependencies(specs)
+
+
+def configured_kv_request(model, horizon):
+    config = model.get_request_resource_configs({}, {"iris_horizon": horizon})["world_kv"]
+    config.apply_conductor_config(
+        kv_layout={
+            label: layout.row()
+            for label, layout in request_kv_layout(horizon)["world_kv"].items()
+        },
+        loop_caps={},
+    )
+    return config
+
+
+def test_engine_request_sizing_and_insufficient_capacity():
+    model = RequestOnlyIRIS(max_rollout_horizon=20)
+    spec = configured_specs(model)["world_kv"]
+    assert (spec.config.tokens_per_page, spec.config.max_num_pages) == (16, 64)
+    for horizon, pages in ((1, 3), (19, 22), (20, 25)):
+        config = configured_kv_request(model, horizon)
+        assert config.pages({"world_model"}, {}, spec.config) == pages
+        config.validate(spec)
+
+    # The pool reserves one sink page, leaving only 24 request pages here.
+    spec.config.max_num_pages = 25
+    with pytest.raises(ValueError, match="needs 25 pages"):
+        configured_kv_request(model, 20).validate(spec)
