@@ -1,23 +1,14 @@
 import torch
 
 from mstar.communication.tensors import NameToTensorList
-from mstar.conductor.request_info import (
-    DEFAULT_PARTITION,
-    CurrentForwardConductorMetadata,
-    StreamingConnectionState,
-)
-from mstar.engine.resources import (
-    KVReqConfig,
-    NodeResourceSpec,
-    ResourceReqConfig,
-    SamplingReqConfig,
-)
-from mstar.graph.base import GraphEdge, TensorPointerInfo
-from mstar.model.base import ForwardPassArgs, KVLabel, Model, ProcessPromptOutput
+from mstar.conductor.request_info import DEFAULT_PARTITION
+from mstar.engine.state import Array, Sampler, SampleSettings
+from mstar.graph.base import TensorPointerInfo
+from mstar.model.base import KVLabel, Model, ProcessPromptOutput, WalkStep
 from mstar.model.iris.config import HF_REPO, IMAGE_SHAPE, IRISConfig
 from mstar.model.iris.resources import (
     context_epochs,
-    iris_resources,
+    iris_state,
     request_kv_layout,
 )
 from mstar.model.multimodal import PromptPart
@@ -139,7 +130,7 @@ class IRISModel(Model):
             },
             metadata={
                 "iris_horizon": horizon,
-                "kv_layout": request_kv_layout(horizon),
+                "state_layout": request_kv_layout(horizon),
             },
         )
 
@@ -154,90 +145,29 @@ class IRISModel(Model):
             )
         return horizon
 
-    def get_initial_forward_pass_args(
+    def walk_plan(
         self,
         partition_name: str,
         input_modalities: list[str],
         output_modalities: list[str],
         input_signals: dict[str, list[TensorPointerInfo]],
-        model_kwargs: dict | None = None,
-    ) -> ForwardPassArgs:
+        model_kwargs: dict,
+    ) -> list[WalkStep]:
         if partition_name != DEFAULT_PARTITION:
             raise ValueError(f"Unknown IRIS partition: {partition_name!r}")
-
         if input_modalities != ["image"]:
             raise ValueError("IRIS requires exactly one image input.")
-
         if output_modalities != ["video_frame", "scalar", "tensor"]:
-            raise ValueError(
-                "IRIS requires output_modalities="
-                "['video_frame', 'scalar', 'tensor']."
-            )
-
+            raise ValueError("IRIS requires output_modalities=['video_frame', 'scalar', 'tensor'].")
         horizon = self._horizon(model_kwargs)
-        inputs = []
-
-        for name, node, shape, dtype in (
-            ("initial_image", "image_encoder", IMAGE_SHAPE, torch.float32),
-            ("actions", "world_model", (horizon,), torch.int64),
+        for name, shape, dtype in (
+            ("initial_image", IMAGE_SHAPE, torch.float32),
+            ("actions", (horizon,), torch.int64),
         ):
             infos = input_signals.get(name, [])
-            if (
-                len(infos) != 1
-                or tuple(infos[0].dims) != shape
-                or infos[0].dtype != dtype
-            ):
-                raise ValueError(
-                    f"IRIS {name} requires one {dtype} descriptor "
-                    f"shaped {shape}."
-                )
-
-            inputs.append(
-                GraphEdge(
-                    next_node=node,
-                    name=name,
-                    tensor_info=list(infos),
-                )
-            )
-
-        metadata = CurrentForwardConductorMetadata(
-            graph_walk="imagine",
-            is_prefill=True,
-            input_modalities=list(input_modalities),
-            output_modalities=list(output_modalities),
-            kwargs={"iris_horizon": horizon},
-        )
-
-        return ForwardPassArgs(
-            full_metadata=metadata,
-            inputs=inputs,
-            unpersist_tensors=[
-                info for edge in inputs for info in edge.tensor_info
-            ],
-            step_metadata={"iris_horizon": horizon},
-        )
-
-    def get_partition_forward_pass_args(
-        self,
-        partition_name: str,
-        partition_metadata: CurrentForwardConductorMetadata,
-        persist_signals: dict[str, list[TensorPointerInfo]],
-        incoming_connections: list[StreamingConnectionState] | None = None,
-    ) -> ForwardPassArgs:
-        if (
-            partition_name != DEFAULT_PARTITION
-            or partition_metadata.graph_walk != "imagine"
-        ):
-            raise ValueError(
-                "IRIS can finish only its default partition's imagine walk."
-            )
-
-        return ForwardPassArgs(
-            full_metadata=partition_metadata,
-            inputs=[],
-            unpersist_tensors=[],
-            request_done=True,
-        )
+            if len(infos) != 1 or tuple(infos[0].dims) != shape or infos[0].dtype != dtype:
+                raise ValueError(f"IRIS {name} requires one {dtype} descriptor shaped {shape}.")
+        return [WalkStep("imagine", step_metadata={"iris_horizon": horizon})]
 
     def get_max_output_tokens(self, **model_kwargs) -> int:
         return self._horizon(model_kwargs)
@@ -245,8 +175,14 @@ class IRISModel(Model):
     def get_loop_caps(self, **model_kwargs) -> dict[str, int]:
         return {"rollout_loop": self._horizon(model_kwargs)}
 
-    def get_node_resources(self) -> list[NodeResourceSpec]:
-        return iris_resources()
+    def declare_state(self) -> list[Array | Sampler]:
+        return iris_state(self.config.max_rollout_horizon)
+
+    def kernel_settings(self) -> dict[str, dict]:
+        return {
+            "encoder_attn": {"max_segments_per_request": 1},
+            "decoder_attn": {"max_segments_per_request": 1},
+        }
 
     def kv_labels(self) -> dict[str, dict[str, KVLabel]]:
         return {
@@ -258,32 +194,15 @@ class IRISModel(Model):
 
     def get_request_resource_configs(
         self,
-        partition_fwd_args: dict[str, ForwardPassArgs],
-        model_kwargs: dict | None = None,
-    ) -> dict[str, ResourceReqConfig]:
-        horizon = self._horizon(model_kwargs)
-        configs: dict[str, ResourceReqConfig] = {
-            "world_kv": KVReqConfig(
-                needed_labels=[
-                    epoch.label for epoch in context_epochs(horizon)
-                ],
-                prefix_cache=False,
+        input_modalities: list[str],
+        output_modalities: list[str],
+        model_kwargs: dict,
+    ) -> dict[str, SampleSettings]:
+        self._horizon(model_kwargs)
+        return {
+            key: SampleSettings(
+                temperature=1.0, top_k=0, top_p=1.0, min_p=0.0,
+                repetition_penalty=1.0, ignore_eos=True, penalize_prompt=False,
             )
+            for key in ("observation_sampler", "reward_sampler", "ending_sampler")
         }
-
-        for key in (
-            "observation_sampler",
-            "reward_sampler",
-            "ending_sampler",
-        ):
-            configs[key] = SamplingReqConfig(
-                temperature=1.0,
-                top_k=0,
-                top_p=1.0,
-                min_p=0.0,
-                repetition_penalty=1.0,
-                ignore_eos=True,
-                penalize_prompt=False,
-            )
-
-        return configs

@@ -45,6 +45,7 @@ myst_enable_extensions = [
     "linkify",
 ]
 myst_heading_anchors = 3
+myst_fence_as_directive = ["mermaid"]
 
 templates_path = ["_templates"]
 source_suffix = {
@@ -53,7 +54,7 @@ source_suffix = {
 }
 master_doc = "index"
 language = "en"
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "mintlify", "Thumbs.db", ".DS_Store"]
 
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]

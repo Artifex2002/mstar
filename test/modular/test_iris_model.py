@@ -6,7 +6,9 @@ import pytest
 import torch
 import yaml
 
-from mstar.engine.resources import apply_yaml_overrides, resolve_spec_dependencies
+from mstar.engine.resources import KVReqConfig, apply_yaml_overrides, resolve_spec_dependencies
+from mstar.engine.state.adapters import build_specs, sampling_configs
+from mstar.engine.state.adapters import kv_layouts as engine_layouts
 from mstar.graph.base import TensorPointerInfo
 from mstar.model.iris.iris_model import IRISModel
 from mstar.model.iris.resources import context_epochs, request_kv_layout
@@ -137,7 +139,7 @@ def initial_args(model, horizon=3):
         "initial_image": [descriptor(torch.zeros(3, 64, 64), 1)],
         "actions": [descriptor(torch.zeros(3, dtype=torch.int64), 2)],
     }
-    return model.get_initial_forward_pass_args(
+    return model.walk_plan(
         partition_name="default",
         input_modalities=["image"],
         output_modalities=["video_frame", "scalar", "tensor"],
@@ -146,22 +148,12 @@ def initial_args(model, horizon=3):
     )
 
 
-def test_initial_routing_and_completion(model):
-    args = initial_args(model)
-    assert args.full_metadata.graph_walk == "imagine"
-    assert not args.request_done
-    assert args.step_metadata == {"iris_horizon": 3}
-    assert [(edge.name, edge.next_node) for edge in args.inputs] == [
-        ("initial_image", "image_encoder"),
-        ("actions", "world_model"),
-    ]
-    assert len(args.unpersist_tensors) == 2
-
-    done = model.get_partition_forward_pass_args(
-        "default", args.full_metadata, {}
-    )
-    assert done.request_done
-    assert done.inputs == []
+def test_single_walk_plan_and_rollout_limits(model):
+    plan = initial_args(model)
+    assert len(plan) == 1
+    assert plan[0].walk == "imagine"
+    assert dict(plan[0].step_metadata) == {"iris_horizon": 3}
+    assert dict(plan[0].bind) == {}
     assert model.get_max_output_tokens(iris_horizon=3) == 3
     assert model.get_loop_caps(iris_horizon=3) == {"rollout_loop": 3}
 
@@ -178,7 +170,7 @@ def test_action_descriptor_must_match_horizon(model):
 
 
 def test_resource_ownership_and_dependencies(model):
-    specs = model.get_node_resources()
+    specs = build_specs(model.declare_state(), kernel_settings=model.kernel_settings())
     by_key = {spec.resource_key: spec for spec in specs}
 
     assert len(specs) == len(by_key) == 8
@@ -199,7 +191,8 @@ def test_resource_ownership_and_dependencies(model):
 
 
 def test_resource_geometry(model):
-    by_key = {spec.resource_key: spec for spec in model.get_node_resources()}
+    specs = build_specs(model.declare_state(), kernel_settings=model.kernel_settings())
+    by_key = {spec.resource_key: spec for spec in specs}
     kv = by_key["world_kv"].config
     assert (
         kv.num_layers,
@@ -208,7 +201,7 @@ def test_resource_geometry(model):
         kv.head_dim,
         kv.max_seq_len,
     ) == (10, 4, 4, 64, 340)
-    assert not kv.prefix_cache
+    assert all(label.keys is None for label in model.kv_labels()["world_kv"].values())
 
     assert by_key["observation_sampler"].vocab_size == 512
     assert by_key["reward_sampler"].vocab_size == 3
@@ -217,7 +210,7 @@ def test_resource_geometry(model):
         config = by_key[key].config
         assert config.num_qo_heads == config.num_kv_heads == 1
         assert config.head_dim == 64
-        assert config.max_tokens_per_request == 256
+        assert config.max_segments_per_request == 1
         assert config.dtype == torch.float32
 
 
@@ -253,20 +246,18 @@ def test_invalid_context_horizon(horizon):
 
 def test_preprocessing_returns_kv_layout(model):
     result = prepare(model)
-    layout = result.metadata["kv_layout"]["world_kv"]["epoch_0"]
+    layout = result.metadata["state_layout"]["world_kv"]["epoch_0"]
     assert layout.spans[0].length == 67
-    assert layout.row()
+    assert layout.spans[0].advance == 67
 
 
 def test_request_resource_settings():
     model = RequestOnlyIRIS(max_rollout_horizon=20)
     assert set(model.kv_labels()["world_kv"]) == {"epoch_0", "epoch_1"}
 
-    configs = model.get_request_resource_configs({}, {"iris_horizon": 20})
-    assert configs["world_kv"].needed_labels == ["epoch_0", "epoch_1"]
-    assert not configs["world_kv"].prefix_cache
-    shorter = model.get_request_resource_configs({}, {"iris_horizon": 1})
-    assert shorter["world_kv"].needed_labels == ["epoch_0"]
+    configs = sampling_configs(model.get_request_resource_configs([], [], {"iris_horizon": 20}), model.declare_state())
+    assert configured_kv_request(model, 20).needed_labels == ["epoch_0", "epoch_1"]
+    assert configured_kv_request(model, 1).needed_labels == ["epoch_0"]
 
     for key in ("observation_sampler", "reward_sampler", "ending_sampler"):
         config = configs[key]
@@ -281,20 +272,18 @@ def test_request_resource_settings():
 
 
 def configured_specs(model):
-    specs = model.get_node_resources()
+    specs = build_specs(model.declare_state(), kernel_settings=model.kernel_settings())
     path = Path(__file__).resolve().parents[2] / "configs/iris.yaml"
     apply_yaml_overrides(specs, yaml.safe_load(path.read_text()))
     return resolve_spec_dependencies(specs)
 
 
 def configured_kv_request(model, horizon):
-    config = model.get_request_resource_configs({}, {"iris_horizon": horizon})["world_kv"]
+    declared = request_kv_layout(horizon)
+    layouts = engine_layouts(model.declare_state(), declared, {})["world_kv"]
+    config = KVReqConfig(needed_labels=list(layouts), prefix_cache=False)
     config.apply_conductor_config(
-        kv_layout={
-            label: layout.row()
-            for label, layout in request_kv_layout(horizon)["world_kv"].items()
-        },
-        loop_caps={},
+        kv_layout={label: layout.row() for label, layout in layouts.items()}, loop_caps={}
     )
     return config
 

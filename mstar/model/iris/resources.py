@@ -1,22 +1,23 @@
-"""IRIS resource declarations; the engine owns their execution and lifecycle."""
+"""IRIS state declarations and the request's independent context layouts."""
 
 from typing import NamedTuple
 
 import torch
 
-from mstar.engine.resources import (
-    AttentionConfig,
-    AttentionSpec,
-    KVSpec,
-    NodeResourceSpec,
-    PagedKVConfig,
-    PositionConfig,
-    PositionSpec,
-    RaggedAttentionConfig,
-    RaggedAttentionSpec,
-    SamplerSpec,
+from mstar.engine.state import (
+    Array,
+    Attend,
+    Block,
+    Causal,
+    Entry,
+    KVEntry,
+    Layout,
+    Positions,
+    Read,
+    Sampler,
+    Span,
+    TensorType,
 )
-from mstar.model.base import LabelLayout, Span
 from mstar.model.iris.config import (
     CONTEXT_TOKENS,
     FRAMES_PER_CONTEXT,
@@ -30,68 +31,36 @@ from mstar.model.iris.config import (
 )
 
 
-def iris_resources() -> list[NodeResourceSpec]:
+def iris_state(max_rollout_horizon: int) -> list[Array | Sampler]:
     world_nodes = {"world_model"}
-
-    specs: list[NodeResourceSpec] = [
-        KVSpec(
-            resource_key="world_kv",
-            nodes=world_nodes,
-            config=PagedKVConfig(
-                num_layers=TRANSFORMER_LAYERS,
-                num_kv_heads=TRANSFORMER_HEADS,
-                num_qo_heads=TRANSFORMER_HEADS,
-                head_dim=TRANSFORMER_HEAD_DIM,
-                max_seq_len=CONTEXT_TOKENS,
-                prefix_cache=False,
-            ),
-        ),
-        AttentionSpec(
-            resource_key="world_attn",
-            nodes=world_nodes,
-            config=AttentionConfig(kv_cache="world_kv"),
-        ),
-        PositionSpec(
-            resource_key="world_pos",
-            nodes=world_nodes,
-            config=PositionConfig(kv_cache="world_kv"),
+    declarations: list[Array | Sampler] = [
+        Array(
+            "world_kv", nodes=world_nodes,
+            layers=frozenset(range(TRANSFORMER_LAYERS)),
+            entry=KVEntry(heads=TRANSFORMER_HEADS, head_dim=TRANSFORMER_HEAD_DIM),
+            max_len=CONTEXT_TOKENS,
+            labels={epoch.label for epoch in context_epochs(max_rollout_horizon)},
+            positions=Positions(),
+            reads={"world_attn": Read(mask=Causal(), op=Attend(q_heads=TRANSFORMER_HEADS))},
         ),
     ]
-
     for key, vocab_size in (
         ("observation_sampler", OBSERVATION_VOCAB_SIZE),
-        ("reward_sampler", 3),
-        ("ending_sampler", 2),
+        ("reward_sampler", 3), ("ending_sampler", 2),
     ):
-        specs.append(
-            SamplerSpec(
-                resource_key=key,
-                nodes=world_nodes,
-                vocab_size=vocab_size,
-                enable_repetion_penalty=False,
-            )
-        )
-
-    for key, node in (
-        ("encoder_attn", "image_encoder"),
-        ("decoder_attn", "image_decoder"),
-    ):
-        specs.append(
-            RaggedAttentionSpec(
-                resource_key=key,
-                nodes={node},
-                config=RaggedAttentionConfig(
-                    num_qo_heads=1,
-                    num_kv_heads=1,
-                    head_dim=TOKENIZER_ATTENTION_CHANNELS,
-                    dtype=torch.float32,
-                    max_segments_per_request=1,
-                    max_tokens_per_request=16 * 16,
-                ),
-            )
-        )
-
-    return specs
+        declarations.append(Sampler(key, nodes=world_nodes, vocab_size=vocab_size, penalty=False))
+    field = TensorType((1, TOKENIZER_ATTENTION_CHANNELS), dtype=torch.float32, shard=0)
+    for kind, node in (("encoder", "image_encoder"), ("decoder", "image_decoder")):
+        # Each resolution needs an independent plan; identical reads share the engine's ragged resource.
+        for resolution in (16, 8, 4):
+            read = f"{kind}_attn" if resolution == 16 else f"{kind}_attn_{resolution}"
+            declarations.append(Array(
+                f"{kind}_features_{resolution}", nodes={node}, layers={0},
+                entry=Entry({"k": field, "v": field}), max_len=0,
+                labels={f"spatial_{resolution}"},
+                reads={read: Read(mask=Block(), op=Attend(q_heads=1))},
+            ))
+    return declarations
 
 
 class ContextEpoch(NamedTuple):
@@ -118,10 +87,10 @@ def context_epochs(horizon: int) -> tuple[ContextEpoch, ...]:
     return tuple(epochs)
 
 
-def request_kv_layout(horizon: int) -> dict[str, dict[str, LabelLayout]]:
+def request_kv_layout(horizon: int) -> dict[str, dict[str, Layout]]:
     return {
         "world_kv": {
-            epoch.label: LabelLayout(
+            epoch.label: Layout(
                 spans=(
                     Span(
                         kind="rows",

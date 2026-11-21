@@ -4,4 +4,3 @@ node_groups:
   - node_names: [policy_step]
     ranks: [0]
     graph_walks: [act]
-    

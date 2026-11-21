@@ -26,7 +26,7 @@ class _StopError(Exception):
 
 def _entrypoint_prefix(monkeypatch, tmp_path, *argv) -> str:
     """The prefix ``mstar-serve`` hands the API server, without starting one."""
-    from mstar.api_server import entrypoint
+    from mstar.api_server import entrypoint, rust_frontend
     from mstar.model import registry
 
     seen = {}
@@ -46,8 +46,12 @@ def _entrypoint_prefix(monkeypatch, tmp_path, *argv) -> str:
     monkeypatch.setattr(registry, "get_model_class", lambda name: _Model)
     monkeypatch.setattr(entrypoint, "model_init_kwargs", lambda name: {})
     monkeypatch.setattr(entrypoint, "APIServer", fake_api_server)
+    # CPU Core builds the extension, not mstar-server
+    monkeypatch.setattr(rust_frontend, "find_server_binary", lambda explicit=None: "mstar-server")
     # sizing torch's pool would outlive the test in this process
     monkeypatch.setattr(entrypoint, "_set_preprocess_threads", lambda model, config: None)
+    # and so would handing pytest's log handlers to a writer thread, which repeats every later record
+    monkeypatch.setattr(entrypoint, "log_off_thread", lambda: None)
     with pytest.raises(_StopError):
         entrypoint.main(["--config", str(cfg), *argv])
     return seen["socket_path_prefix"]
@@ -91,6 +95,8 @@ def _dynamo_prefix(monkeypatch, *argv) -> dict:
         raise _StopError
 
     monkeypatch.setattr(worker, "build_server", fake_build_server)
+    # main() would hand pytest's log handlers to a writer thread, which repeats every later record
+    monkeypatch.setattr("mstar.utils.logging_config.log_off_thread", lambda: None)
     with pytest.raises(_StopError):
         worker.main(["--config", "c.yaml", "--model-path", "/m", *argv])
     return seen
