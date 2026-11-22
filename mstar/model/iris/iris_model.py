@@ -3,9 +3,10 @@ import torch
 from mstar.communication.tensors import NameToTensorList
 from mstar.conductor.request_info import DEFAULT_PARTITION
 from mstar.engine.state import Array, Sampler, SampleSettings
-from mstar.graph.base import TensorPointerInfo
+from mstar.graph.base import GraphSection, TensorPointerInfo
 from mstar.model.base import KVLabel, Model, ProcessPromptOutput, WalkStep
 from mstar.model.iris.config import HF_REPO, IMAGE_SHAPE, IRISConfig
+from mstar.model.iris.graph import imagination_graph
 from mstar.model.iris.resources import (
     context_epochs,
     iris_state,
@@ -144,6 +145,11 @@ class IRISModel(Model):
                 "IRIS requires a validated iris_horizon from process_prompt."
             )
         return horizon
+
+    def get_graph_walk_graphs(self) -> dict[str, GraphSection]:
+        return {
+            "imagine": imagination_graph(self.config.max_rollout_horizon),
+        }
 
     def walk_plan(
         self,
